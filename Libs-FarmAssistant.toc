@@ -1,4 +1,4 @@
-## Interface: 110002
+## Interface: 110200
 ## Title: Libs - Farm Assistant
 ## Notes: Loot tracking for farming and gathering.
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
