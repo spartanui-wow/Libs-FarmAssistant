@@ -1,3 +1,0 @@
-local LibFA = ...
-
-local Config = LibFA:NewModule('Config', 'AceConsole-3.0', 'AceEvent-3.0', 'AceHook-3.0')

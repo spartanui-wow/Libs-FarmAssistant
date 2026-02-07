@@ -1,13 +1,39 @@
-## Interface: 110200
-## Title: Libs - Farm Assistant
-## Notes: Loot tracking for farming and gathering.
+## Interface: 120000
+## Title: Lib's - Farm Assistant
+## Notes: Session-based farming tracker with loot, money, currency, and reputation tracking
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
 ## Version: @project-version@
-## Author: wutname1
-## X-Curse-Project-ID: xxxxxxxx
-## X-Wago-ID: xxxxxxxxx
-## X-Github: https://github.com/Wutname1/Libs-FarmAssistant
+## Author: Lib
+## SavedVariables: LibsFarmAssistantDB
+## OptionalDeps: Libs-DataBar, Libs-AddonTools
+## Category: Data Broker
+## Category-deDE: Datenbroker
+## Category-esES: Intermediario de Datos
+## Category-esMX: Intermediario de Datos
+## Category-frFR: Courtier de Données
+## Category-itIT: Data Broker
+## Category-koKR:
+## Category-ptBR: Corretor de Dados
+## Category-ruRU: Посредник данных
+## Category-zhCN: 数据管理
+## Category-zhTW: 資料管理
 
-Libs/Ace3/Ace3.xml
+# Libraries
+libs\Ace3\Ace3.xml
+libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+libs\LibDBIcon-1.0\lib.xml
 
-main.lua
+# Core
+Libs-FarmAssistant.lua
+Core\Database.lua
+Core\SessionManager.lua
+Core\LootTracker.lua
+Core\MoneyTracker.lua
+Core\CurrencyTracker.lua
+Core\ReputationTracker.lua
+
+# UI
+UI\DataBroker.lua
+UI\Tooltip.lua
+UI\Options.lua
+UI\MinimapButton.lua
