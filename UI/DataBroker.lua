@@ -38,6 +38,14 @@ function LibsFarmAssistant:UpdateDisplay()
 		return
 	end
 
+	-- Check for session notifications and goal completion
+	if self.CheckSessionNotification then
+		self:CheckSessionNotification()
+	end
+	if self.CheckGoalCompletion then
+		self:CheckGoalCompletion()
+	end
+
 	if not self:IsSessionActive() then
 		dataObj.text = '|cff808080Paused|r'
 		return
@@ -56,7 +64,7 @@ function LibsFarmAssistant:UpdateDisplay()
 		local _, totalItems = self:GetItemCounts()
 		local parts = {}
 		if totalItems > 0 then
-			table.insert(parts, totalItems .. ' items')
+			table.insert(parts, self:FormatNumber(totalItems) .. ' items')
 		end
 		if self.session.money > 0 then
 			table.insert(parts, self:FormatMoney(self.session.money))
@@ -70,7 +78,7 @@ function LibsFarmAssistant:UpdateDisplay()
 		local _, totalItems = self:GetItemCounts()
 		if totalItems > 0 then
 			local rate = hours > 0 and string.format(' (%.0f/hr)', totalItems / hours) or ''
-			dataObj.text = totalItems .. ' items' .. rate
+			dataObj.text = self:FormatNumber(totalItems) .. ' items' .. rate
 		else
 			dataObj.text = 'Farming...'
 		end

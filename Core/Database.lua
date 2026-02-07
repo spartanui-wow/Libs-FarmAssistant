@@ -7,10 +7,17 @@ local defaults = {
 			active = true,
 			startTime = 0, -- GetTime() value
 			pausedDuration = 0, -- Accumulated paused seconds
-			items = {}, -- [itemID] = { name, link, icon, quality, count }
+			items = {}, -- [itemID] = { name, link, icon, quality, count, sellPrice }
 			money = 0, -- Copper gained (delta tracking)
 			currencies = {}, -- [currencyName] = { name, icon, count }
 			reputation = {}, -- [factionName] = gained
+			honor = 0, -- Total honor gained
+		},
+		history = {}, -- Array of session snapshots, newest first
+		bestRates = {
+			itemsPerHour = 0,
+			goldPerHour = 0,
+			honorPerHour = 0,
 		},
 	},
 	profile = {
@@ -20,6 +27,14 @@ local defaults = {
 			money = true,
 			currency = true,
 			reputation = true,
+			honor = true,
+			itemValue = true,
+		},
+		goals = {}, -- Array of goal definitions
+		goalSound = true, -- Play sound on goal completion
+		sessionNotifications = {
+			enabled = false,
+			frequencyMinutes = 15,
 		},
 		display = {
 			format = 'items', -- 'items', 'money', 'combined'

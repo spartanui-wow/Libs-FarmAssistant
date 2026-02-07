@@ -70,6 +70,9 @@ end
 
 ---Reset session to fresh state
 function LibsFarmAssistant:ResetSession()
+	-- Save current session to history before clearing
+	self:SaveSessionToHistory()
+
 	local session = self.session
 
 	session.active = true
@@ -79,7 +82,11 @@ function LibsFarmAssistant:ResetSession()
 	session.money = 0
 	wipe(session.currencies)
 	wipe(session.reputation)
+	session.honor = 0
 	pauseStartTime = 0
+
+	-- Reset goal completion tracking
+	self:ResetGoalCompletion()
 
 	-- Re-snapshot money for delta tracking
 	self:SnapshotMoney()
@@ -101,6 +108,16 @@ function LibsFarmAssistant:GetItemCounts()
 	return unique, total
 end
 
+---Get total estimated vendor value of all session items (in copper)
+---@return number copper
+function LibsFarmAssistant:GetTotalVendorValue()
+	local total = 0
+	for _, item in pairs(self.session.items) do
+		total = total + (item.sellPrice or 0) * (item.count or 0)
+	end
+	return total
+end
+
 ---Print session summary to chat
 function LibsFarmAssistant:PrintSummary()
 	local duration = self:GetSessionDuration()
@@ -112,10 +129,10 @@ function LibsFarmAssistant:PrintSummary()
 	-- Items
 	local _, totalItems = self:GetItemCounts()
 	if totalItems > 0 then
-		self:Print(string.format('Items: %d looted', totalItems))
+		self:Print(string.format('Items: %s looted', self:FormatNumber(totalItems)))
 		for _, item in pairs(self.session.items) do
 			local rate = hours > 0 and string.format(' (%.0f/hr)', item.count / hours) or ''
-			self:Print(string.format('  %s x%d%s', item.link or item.name, item.count, rate))
+			self:Print(string.format('  %s x%s%s', item.link or item.name, self:FormatNumber(item.count), rate))
 		end
 	end
 
@@ -126,12 +143,19 @@ function LibsFarmAssistant:PrintSummary()
 
 	-- Currency
 	for name, data in pairs(self.session.currencies) do
-		self:Print(string.format('Currency: %s x%d', name, data.count))
+		self:Print(string.format('Currency: %s x%s', name, self:FormatNumber(data.count)))
 	end
 
 	-- Reputation
 	for faction, gained in pairs(self.session.reputation) do
-		self:Print(string.format('Rep: %s +%d', faction, gained))
+		self:Print(string.format('Rep: %s +%s', faction, self:FormatNumber(gained)))
+	end
+
+	-- Honor
+	local honor = self.session.honor or 0
+	if honor > 0 then
+		local honorRate = hours > 0 and string.format(' (%s/hr)', self:FormatNumber(honor / hours)) or ''
+		self:Print(string.format('Honor: %s%s', self:FormatNumber(honor), honorRate))
 	end
 end
 
@@ -150,6 +174,13 @@ function LibsFarmAssistant:FormatDuration(seconds)
 	end
 end
 
+---Format a number with comma separators
+---@param number number
+---@return string
+function LibsFarmAssistant:FormatNumber(number)
+	return BreakUpLargeNumbers(math.floor(number))
+end
+
 ---Format copper into gold/silver/copper string
 ---@param copper number Amount in copper
 ---@return string
@@ -160,7 +191,7 @@ function LibsFarmAssistant:FormatMoney(copper)
 	local rem = copper % 100
 
 	if gold > 0 then
-		return string.format('%dg %ds %dc', gold, silver, rem)
+		return string.format('%sg %ds %dc', BreakUpLargeNumbers(gold), silver, rem)
 	elseif silver > 0 then
 		return string.format('%ds %dc', silver, rem)
 	else

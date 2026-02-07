@@ -1,6 +1,6 @@
 ## Interface: 120000
 ## Title: Lib's - Farm Assistant
-## Notes: Session-based farming tracker with loot, money, currency, and reputation tracking
+## Notes: Session-based farming tracker with loot, money, currency, reputation, and honor tracking with goals and history
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
 ## Version: @project-version@
 ## Author: Lib
@@ -31,6 +31,10 @@ Core\LootTracker.lua
 Core\MoneyTracker.lua
 Core\CurrencyTracker.lua
 Core\ReputationTracker.lua
+Core\HonorTracker.lua
+Core\SessionHistory.lua
+Core\Notifications.lua
+Core\GoalTracker.lua
 
 # UI
 UI\DataBroker.lua
