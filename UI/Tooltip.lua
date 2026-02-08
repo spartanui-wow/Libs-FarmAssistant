@@ -210,7 +210,7 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 	-- Click hints
 	tooltip:AddLine(' ')
 	tooltip:AddLine('|cffffff00Left Click:|r Toggle Pause | |cffffff00Middle:|r Reset')
-	tooltip:AddLine('|cffffff00Shift+Left:|r Options | |cffffff00Right:|r Options')
+	tooltip:AddLine('|cffffff00Shift+Left:|r Dashboard | |cffffff00Right:|r Options')
 
 	tooltip:Show()
 end

@@ -40,6 +40,13 @@ local defaults = {
 		display = {
 			format = 'items', -- 'items', 'money', 'combined'
 		},
+		popup = {
+			point = 'CENTER',
+			x = 0,
+			y = 0,
+			width = 420,
+			height = 350,
+		},
 		minimap = {
 			hide = false,
 		},

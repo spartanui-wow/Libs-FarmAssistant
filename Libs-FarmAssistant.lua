@@ -85,8 +85,10 @@ function LibsFarmAssistant:SlashCommand(input)
 		self:ToggleSession()
 	elseif input == 'summary' then
 		self:PrintSummary()
+	elseif input == 'popup' or input == 'dashboard' then
+		self:TogglePopup()
 	else
-		self:Print('Commands: /farmassist [config|reset|pause|summary]')
+		self:Print('Commands: /farmassist [config|reset|pause|summary|popup]')
 	end
 end
 

@@ -14,7 +14,7 @@ function LibsFarmAssistant:InitializeDataBroker()
 		OnClick = function(frame, button)
 			if button == 'LeftButton' then
 				if IsShiftKeyDown() then
-					LibsFarmAssistant:OpenOptions()
+					LibsFarmAssistant:TogglePopup()
 				else
 					LibsFarmAssistant:ToggleSession()
 				end
