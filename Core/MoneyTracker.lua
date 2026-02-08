@@ -34,6 +34,10 @@ function LibsFarmAssistant:OnMoneyChanged()
 		self.session.money = self.session.money + delta
 		self:Log(string.format('Money gained: %s', self:FormatMoney(delta)), 'debug')
 		self:UpdateDisplay()
+
+		if self.db.chatEcho then
+			self:Print(string.format('[Farm] +%s', self:FormatMoney(delta)))
+		end
 	end
 
 	-- Always update snapshot

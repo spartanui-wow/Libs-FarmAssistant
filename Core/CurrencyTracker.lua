@@ -54,4 +54,8 @@ function LibsFarmAssistant:OnCurrencyReceived(event, text)
 
 	self:Log(string.format('Currency: %s x%d', currencyName, quantity), 'debug')
 	self:UpdateDisplay()
+
+	if self.db.chatEcho then
+		self:Print(string.format('[Farm] %s x%d', currencyName, quantity))
+	end
 end

@@ -100,6 +100,10 @@ function LibsFarmAssistant:RecordItem(itemID, name, link, icon, quality, count, 
 
 	self:Log(string.format('Looted: %s x%d', name, count), 'debug')
 	self:UpdateDisplay()
+
+	if self.db.chatEcho then
+		self:Print(string.format('[Farm] %s x%d', link or name, count))
+	end
 end
 
 ---Handle ITEM_DATA_LOAD_RESULT for async backfill

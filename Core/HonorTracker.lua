@@ -26,4 +26,8 @@ function LibsFarmAssistant:OnHonorGained(event, text)
 
 	self:Log(string.format('Honor: +%d', amount), 'debug')
 	self:UpdateDisplay()
+
+	if self.db.chatEcho then
+		self:Print(string.format('[Farm] +%d honor', amount))
+	end
 end

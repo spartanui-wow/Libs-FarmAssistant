@@ -387,6 +387,18 @@ function LibsFarmAssistant:InitializeOptions()
 							LibsFarmAssistant:UpdateDisplay()
 						end,
 					},
+					chatEcho = {
+						name = 'Echo to Chat',
+						desc = 'Print loot, money, currency, reputation, and honor gains to chat',
+						type = 'toggle',
+						order = 2,
+						get = function()
+							return LibsFarmAssistant.db.chatEcho
+						end,
+						set = function(_, val)
+							LibsFarmAssistant.db.chatEcho = val
+						end,
+					},
 				},
 			},
 			goals = {

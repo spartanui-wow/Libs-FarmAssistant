@@ -40,6 +40,7 @@ local defaults = {
 		display = {
 			format = 'items', -- 'items', 'money', 'combined'
 		},
+		chatEcho = false, -- Echo loot/money/currency/rep/honor to chat
 		smartSession = {
 			enabled = false,
 			autoStart = false,

@@ -31,4 +31,8 @@ function LibsFarmAssistant:OnReputationGained(event, text)
 
 	self:Log(string.format('Rep: %s +%d', faction, amount), 'debug')
 	self:UpdateDisplay()
+
+	if self.db.chatEcho then
+		self:Print(string.format('[Farm] %s +%d rep', faction, amount))
+	end
 end
