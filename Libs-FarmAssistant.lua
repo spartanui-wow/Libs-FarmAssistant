@@ -36,6 +36,31 @@ function LibsFarmAssistant:OnEnable()
 	self:InitializeMinimapButton()
 	self:InitializeOptions()
 
+	-- Register with Addon Compartment (10.x+ dropdown)
+	if AddonCompartmentFrame and AddonCompartmentFrame.RegisterAddon then
+		AddonCompartmentFrame:RegisterAddon({
+			text = "Lib's Farm Assistant",
+			icon = 'Interface/Addons/Libs-FarmAssistant/Logo-Icon',
+			registerForAnyClick = true,
+			notCheckable = true,
+			func = function(_, _, _, _, mouseButton)
+				if mouseButton == 'LeftButton' then
+					self:ToggleSession()
+				else
+					self:OpenOptions()
+				end
+			end,
+			funcOnEnter = function()
+				GameTooltip:SetOwner(AddonCompartmentFrame, 'ANCHOR_CURSOR_RIGHT')
+				GameTooltip:AddLine("|cffffffffLib's|r |cffe21f1fFarm Assistant|r", 1, 1, 1)
+				GameTooltip:AddLine(' ')
+				GameTooltip:AddLine('|cffeda55fLeft-Click|r to toggle farming session.', 1, 1, 1)
+				GameTooltip:AddLine('|cffeda55fRight-Click|r to open options.', 1, 1, 1)
+				GameTooltip:Show()
+			end,
+		})
+	end
+
 	-- Update display every 60 seconds for rate calculations
 	self:ScheduleRepeatingTimer('UpdateDisplay', 60)
 
