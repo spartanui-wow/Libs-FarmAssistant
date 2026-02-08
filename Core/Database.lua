@@ -40,6 +40,12 @@ local defaults = {
 		display = {
 			format = 'items', -- 'items', 'money', 'combined'
 		},
+		smartSession = {
+			enabled = false,
+			autoStart = false,
+			lootThreshold = 3,
+			timeWindowSeconds = 30,
+		},
 		popup = {
 			point = 'CENTER',
 			x = 0,

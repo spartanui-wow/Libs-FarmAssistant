@@ -35,6 +35,7 @@ Core\HonorTracker.lua
 Core\SessionHistory.lua
 Core\Notifications.lua
 Core\GoalTracker.lua
+Core\SmartSession.lua
 
 # UI
 UI\DataBroker.lua

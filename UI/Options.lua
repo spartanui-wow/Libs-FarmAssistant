@@ -283,6 +283,86 @@ function LibsFarmAssistant:InitializeOptions()
 					},
 				},
 			},
+			smartSession = {
+				name = 'Smart Session',
+				type = 'group',
+				order = 4.5,
+				inline = true,
+				args = {
+					desc = {
+						name = 'Automatically detect farming activity and start/prompt a session. Also auto-pauses when you go AFK.',
+						type = 'description',
+						order = 0,
+					},
+					enabled = {
+						name = 'Enable Smart Session',
+						desc = 'Monitor loot events to detect farming activity',
+						type = 'toggle',
+						order = 1,
+						width = 'full',
+						get = function()
+							return LibsFarmAssistant.db.smartSession.enabled
+						end,
+						set = function(_, val)
+							LibsFarmAssistant.db.smartSession.enabled = val
+							if val then
+								LibsFarmAssistant:InitializeSmartSession()
+							end
+						end,
+					},
+					autoStart = {
+						name = 'Auto-Start Session',
+						desc = 'Automatically start a session instead of showing a prompt',
+						type = 'toggle',
+						order = 2,
+						disabled = function()
+							return not LibsFarmAssistant.db.smartSession.enabled
+						end,
+						get = function()
+							return LibsFarmAssistant.db.smartSession.autoStart
+						end,
+						set = function(_, val)
+							LibsFarmAssistant.db.smartSession.autoStart = val
+						end,
+					},
+					lootThreshold = {
+						name = 'Loot Threshold',
+						desc = 'Number of loot events within the time window to trigger session start',
+						type = 'range',
+						order = 3,
+						min = 2,
+						max = 10,
+						step = 1,
+						disabled = function()
+							return not LibsFarmAssistant.db.smartSession.enabled
+						end,
+						get = function()
+							return LibsFarmAssistant.db.smartSession.lootThreshold
+						end,
+						set = function(_, val)
+							LibsFarmAssistant.db.smartSession.lootThreshold = val
+						end,
+					},
+					timeWindowSeconds = {
+						name = 'Time Window (seconds)',
+						desc = 'Time window in which loot events must occur to trigger',
+						type = 'range',
+						order = 4,
+						min = 10,
+						max = 120,
+						step = 5,
+						disabled = function()
+							return not LibsFarmAssistant.db.smartSession.enabled
+						end,
+						get = function()
+							return LibsFarmAssistant.db.smartSession.timeWindowSeconds
+						end,
+						set = function(_, val)
+							LibsFarmAssistant.db.smartSession.timeWindowSeconds = val
+						end,
+					},
+				},
+			},
 			display = {
 				name = 'Display',
 				type = 'group',
