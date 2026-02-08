@@ -34,6 +34,7 @@ function LibsFarmAssistant:OnEnable()
 	self:InitializeGoalTracker()
 	self:InitializeDataBroker()
 	self:InitializeMinimapButton()
+	self:InitializeItemDragDrop()
 	self:InitializeOptions()
 
 	-- Register with Addon Compartment (10.x+ dropdown)

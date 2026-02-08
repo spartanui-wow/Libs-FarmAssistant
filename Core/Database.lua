@@ -8,6 +8,7 @@ local defaults = {
 			startTime = 0, -- GetTime() value
 			pausedDuration = 0, -- Accumulated paused seconds
 			items = {}, -- [itemID] = { name, link, icon, quality, count, sellPrice }
+			watchedItems = {}, -- [itemID] = { itemID, name, link, icon, quality }
 			money = 0, -- Copper gained (delta tracking)
 			currencies = {}, -- [currencyName] = { name, icon, count }
 			reputation = {}, -- [factionName] = gained

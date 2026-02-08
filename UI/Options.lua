@@ -196,6 +196,58 @@ function LibsFarmAssistant:InitializeOptions()
 					},
 				},
 			},
+			watchedItems = {
+				name = 'Watched Items',
+				type = 'group',
+				order = 3,
+				inline = true,
+				args = {
+					desc = {
+						name = 'Drag items from your bags onto the minimap button to watch them. Watched items appear in the tooltip even before they drop.',
+						type = 'description',
+						order = 0,
+					},
+					list = {
+						name = '',
+						type = 'multiselect',
+						order = 1,
+						width = 'full',
+						values = function()
+							local values = {}
+							local watched = LibsFarmAssistant:GetWatchedItems()
+							for key, info in pairs(watched) do
+								values[key] = (info.link or info.name or key)
+							end
+							return values
+						end,
+						get = function(_, key)
+							return LibsFarmAssistant._watchedSelection and LibsFarmAssistant._watchedSelection[key]
+						end,
+						set = function(_, key, val)
+							if not LibsFarmAssistant._watchedSelection then
+								LibsFarmAssistant._watchedSelection = {}
+							end
+							LibsFarmAssistant._watchedSelection[key] = val or nil
+						end,
+					},
+					removeSelected = {
+						name = 'Remove Selected',
+						desc = 'Stop watching the selected items',
+						type = 'execute',
+						order = 2,
+						func = function()
+							if not LibsFarmAssistant._watchedSelection then
+								return
+							end
+							for key in pairs(LibsFarmAssistant._watchedSelection) do
+								LibsFarmAssistant:UnwatchItem(key)
+							end
+							LibsFarmAssistant._watchedSelection = nil
+							LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+						end,
+					},
+				},
+			},
 			notifications = {
 				name = 'Session Notifications',
 				type = 'group',

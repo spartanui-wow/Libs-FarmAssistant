@@ -97,6 +97,20 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 		end
 	end
 
+	-- Watched items that haven't been looted yet
+	local watchedItems = self:GetWatchedItems()
+	for key, watchInfo in pairs(watchedItems) do
+		if not session.items[key] then
+			-- Not yet looted — show as gray "watching" row
+			tooltip:AddDoubleLine(
+				string.format('  %s', watchInfo.link or watchInfo.name or '?'),
+				'(watching)',
+				0.5, 0.5, 0.5,
+				0.5, 0.5, 0.5
+			)
+		end
+	end
+
 	-- Money section
 	if session.money > 0 then
 		tooltip:AddLine(' ')

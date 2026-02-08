@@ -3,7 +3,7 @@
 ## Notes: Session-based farming tracker with loot, money, currency, reputation, and honor tracking with goals and history
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
 ## Version: @project-version@
-## Author: Lib
+## Author: Wutname1
 ## SavedVariables: LibsFarmAssistantDB
 ## OptionalDeps: Libs-DataBar, Libs-AddonTools
 ## Category: Data Broker
@@ -41,3 +41,4 @@ UI\DataBroker.lua
 UI\Tooltip.lua
 UI\Options.lua
 UI\MinimapButton.lua
+UI\ItemDragDrop.lua
