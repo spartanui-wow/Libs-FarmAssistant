@@ -1,5 +1,9 @@
 package-as: Libs-FarmAssistant
 
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
     README.md
     *.Definition.lua
