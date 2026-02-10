@@ -102,12 +102,7 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 	for key, watchInfo in pairs(watchedItems) do
 		if not session.items[key] then
 			-- Not yet looted — show as gray "watching" row
-			tooltip:AddDoubleLine(
-				string.format('  %s', watchInfo.link or watchInfo.name or '?'),
-				'(watching)',
-				0.5, 0.5, 0.5,
-				0.5, 0.5, 0.5
-			)
+			tooltip:AddDoubleLine(string.format('  %s', watchInfo.link or watchInfo.name or '?'), '(watching)', 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
 		end
 	end
 
