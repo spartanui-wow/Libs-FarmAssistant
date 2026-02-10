@@ -1,4 +1,4 @@
-## Interface: 120000
+## Interface: 120001, 120000, 50503, 38000, 20505, 11508
 ## Title: Lib's - Farm Assistant
 ## Notes: Session-based farming tracker with loot, money, currency, reputation, and honor tracking with goals and history
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
