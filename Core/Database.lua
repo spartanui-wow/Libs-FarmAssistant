@@ -23,6 +23,34 @@ local defaults = {
 	},
 	profile = {
 		qualityFilter = 0, -- Minimum quality to track (0=Poor, 1=Common, etc.)
+		autoLoot = {
+			enabled = true, -- Master toggle for auto-looting
+			fastLoot = true, -- Use LOOT_READY (true) vs LOOT_OPENED (false)
+			closeLoot = false, -- Close loot window after auto-looting
+			lootAll = false, -- Loot everything (overrides all filters)
+			printLooted = false, -- Chat output for looted items
+			printIgnored = false, -- Chat output for ignored items
+			printReason = true, -- Show reason in chat output
+		},
+		lootModules = {
+			whitelist = {}, -- { [itemID_string] = itemName }
+			blacklist = {}, -- { [itemID_string] = itemName }
+			alertList = {}, -- { [itemID_string] = itemName }
+			alertSound = SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959,
+			lootQuest = true, -- Auto-loot quest items
+			lootTokens = true, -- Loot items with no vendor price
+			ignoreBOP = false, -- Skip Bind on Pickup items
+			fishingMode = true, -- Loot everything while fishing
+			minPrice = 0, -- Minimum vendor price in copper (0 = disabled)
+			rarityTable = { -- Per-quality tier toggles
+				[0] = false, -- Poor (grey)
+				[1] = false, -- Common (white)
+				[2] = true, -- Uncommon (green)
+				[3] = true, -- Rare (blue)
+				[4] = true, -- Epic (purple)
+				[5] = true, -- Legendary (orange)
+			},
+		},
 		tracking = {
 			loot = true,
 			money = true,
@@ -73,6 +101,9 @@ end
 
 function LibsFarmAssistant:OnProfileChanged()
 	self.db = self.dbobj.profile
+	if self.InvalidateLootingModuleCache then
+		self:InvalidateLootingModuleCache()
+	end
 	if self.UpdateDisplay then
 		self:UpdateDisplay()
 	end

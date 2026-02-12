@@ -1,6 +1,11 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
+-- Temporary state for new list item inputs
+local newListItem = {
+	itemID = '',
+}
+
 -- Temporary state for new goal inputs
 local newGoal = {
 	type = 'item',
@@ -193,6 +198,522 @@ function LibsFarmAssistant:InitializeOptions()
 						set = function(_, val)
 							LibsFarmAssistant.db.qualityFilter = val
 						end,
+					},
+				},
+			},
+			autoLooting = {
+				name = 'Auto-Looting',
+				type = 'group',
+				order = 2.5,
+				args = {
+					general = {
+						name = 'General',
+						type = 'group',
+						order = 1,
+						inline = true,
+						args = {
+							enabled = {
+								name = 'Enable Auto-Looting',
+								desc = 'Automatically loot items from corpses and containers based on your filter rules',
+								type = 'toggle',
+								order = 1,
+								width = 'full',
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.enabled = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									-- Re-register or unregister loot events
+									LibsFarmAssistant:UnregisterEvent('LOOT_READY')
+									LibsFarmAssistant:UnregisterEvent('LOOT_OPENED')
+									if val then
+										local event = LibsFarmAssistant.db.autoLoot.fastLoot and 'LOOT_READY' or 'LOOT_OPENED'
+										LibsFarmAssistant:RegisterEvent(event, 'OnLootWindowReady')
+									end
+								end,
+							},
+							fastLoot = {
+								name = 'Fast Loot',
+								desc = 'Loot items as fast as possible (uses LOOT_READY event). Disable if you experience issues with loot animations.',
+								type = 'toggle',
+								order = 2,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.fastLoot
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.fastLoot = val
+									-- Switch events
+									if LibsFarmAssistant.db.autoLoot.enabled then
+										LibsFarmAssistant:UnregisterEvent('LOOT_READY')
+										LibsFarmAssistant:UnregisterEvent('LOOT_OPENED')
+										local event = val and 'LOOT_READY' or 'LOOT_OPENED'
+										LibsFarmAssistant:RegisterEvent(event, 'OnLootWindowReady')
+									end
+								end,
+							},
+							closeLoot = {
+								name = 'Close Loot Window',
+								desc = 'Automatically close the loot window after all items are looted',
+								type = 'toggle',
+								order = 3,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.closeLoot
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.closeLoot = val
+								end,
+							},
+							lootAll = {
+								name = 'Loot Everything',
+								desc = 'Override all filters and loot every item (useful for general farming)',
+								type = 'toggle',
+								order = 4,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.lootAll
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.lootAll = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+						},
+					},
+					filters = {
+						name = 'Filters',
+						type = 'group',
+						order = 2,
+						inline = true,
+						args = {
+							filterDesc = {
+								name = 'Items are looted if they pass ANY enabled filter (quality, quest, price, etc.). Blacklisted items are never looted.',
+								type = 'description',
+								order = 0,
+							},
+							qualityFilter = {
+								name = 'Quality Filter',
+								desc = 'Select which item qualities to auto-loot',
+								type = 'multiselect',
+								order = 1,
+								width = 'full',
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								values = {
+									[0] = '|cff9d9d9dPoor|r',
+									[1] = '|cffffffffCommon|r',
+									[2] = '|cff1eff00Uncommon|r',
+									[3] = '|cff0070ddRare|r',
+									[4] = '|cffa335eeEpic|r',
+									[5] = '|cffff8000Legendary|r',
+								},
+								get = function(_, key)
+									return LibsFarmAssistant.db.lootModules.rarityTable[key]
+								end,
+								set = function(_, key, val)
+									LibsFarmAssistant.db.lootModules.rarityTable[key] = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+							lootQuest = {
+								name = 'Loot Quest Items',
+								desc = 'Always auto-loot items needed for active quests',
+								type = 'toggle',
+								order = 2,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.lootModules.lootQuest
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.lootModules.lootQuest = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+							lootTokens = {
+								name = 'Loot Tokens',
+								desc = 'Auto-loot items with no vendor value (tokens, emblems, etc.)',
+								type = 'toggle',
+								order = 3,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.lootModules.lootTokens
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.lootModules.lootTokens = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+							ignoreBOP = {
+								name = 'Ignore Bind on Pickup',
+								desc = 'Skip Bind on Pickup items (leave them on the corpse)',
+								type = 'toggle',
+								order = 4,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.lootModules.ignoreBOP
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.lootModules.ignoreBOP = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+							fishingMode = {
+								name = 'Fishing Mode',
+								desc = 'Automatically loot everything while fishing',
+								type = 'toggle',
+								order = 5,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return LibsFarmAssistant.db.lootModules.fishingMode
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.lootModules.fishingMode = val
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+							minPrice = {
+								name = 'Minimum Vendor Price',
+								desc = 'Loot items worth at least this much (in gold). Set to 0 to disable.',
+								type = 'range',
+								order = 6,
+								min = 0,
+								max = 100,
+								step = 1,
+								bigStep = 5,
+								disabled = function()
+									return not LibsFarmAssistant.db.autoLoot.enabled
+								end,
+								get = function()
+									return (LibsFarmAssistant.db.lootModules.minPrice or 0) / 10000
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.lootModules.minPrice = val * 10000
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+								end,
+							},
+						},
+					},
+					whitelist = {
+						name = 'Whitelist',
+						type = 'group',
+						order = 3,
+						args = {
+							desc = {
+								name = 'Items on the whitelist are always looted, regardless of quality or price filters. Shift+drag items onto the minimap button to add them.',
+								type = 'description',
+								order = 0,
+							},
+							list = {
+								name = 'Current Whitelist',
+								type = 'multiselect',
+								order = 1,
+								width = 'full',
+								values = function()
+									local values = {}
+									for key, name in pairs(LibsFarmAssistant.db.lootModules.whitelist) do
+										values[key] = name
+									end
+									return values
+								end,
+								get = function(_, key)
+									return LibsFarmAssistant._whitelistSelection and LibsFarmAssistant._whitelistSelection[key]
+								end,
+								set = function(_, key, val)
+									if not LibsFarmAssistant._whitelistSelection then
+										LibsFarmAssistant._whitelistSelection = {}
+									end
+									LibsFarmAssistant._whitelistSelection[key] = val or nil
+								end,
+							},
+							removeSelected = {
+								name = 'Remove Selected',
+								type = 'execute',
+								order = 2,
+								func = function()
+									if not LibsFarmAssistant._whitelistSelection then
+										return
+									end
+									for key in pairs(LibsFarmAssistant._whitelistSelection) do
+										LibsFarmAssistant.db.lootModules.whitelist[key] = nil
+									end
+									LibsFarmAssistant._whitelistSelection = nil
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+								end,
+							},
+							addHeader = {
+								name = 'Add Item',
+								type = 'header',
+								order = 10,
+							},
+							addItemID = {
+								name = 'Item ID',
+								desc = 'Enter an Item ID to add to the whitelist',
+								type = 'input',
+								order = 11,
+								get = function()
+									return newListItem.itemID
+								end,
+								set = function(_, val)
+									newListItem.itemID = val
+								end,
+							},
+							addButton = {
+								name = 'Add to Whitelist',
+								type = 'execute',
+								order = 12,
+								func = function()
+									local itemID = tonumber(newListItem.itemID)
+									if not itemID then
+										LibsFarmAssistant:Print('Invalid Item ID')
+										return
+									end
+									local itemName = C_Item.GetItemInfo(itemID)
+									LibsFarmAssistant.db.lootModules.whitelist[tostring(itemID)] = itemName or ('Item ' .. itemID)
+									if not itemName then
+										C_Item.RequestLoadItemDataByID(itemID)
+									end
+									newListItem.itemID = ''
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+								end,
+							},
+						},
+					},
+					blacklist = {
+						name = 'Blacklist',
+						type = 'group',
+						order = 4,
+						args = {
+							desc = {
+								name = 'Items on the blacklist are never auto-looted, even if they match other filters. Ctrl+drag items onto the minimap button to add them.',
+								type = 'description',
+								order = 0,
+							},
+							list = {
+								name = 'Current Blacklist',
+								type = 'multiselect',
+								order = 1,
+								width = 'full',
+								values = function()
+									local values = {}
+									for key, name in pairs(LibsFarmAssistant.db.lootModules.blacklist) do
+										values[key] = name
+									end
+									return values
+								end,
+								get = function(_, key)
+									return LibsFarmAssistant._blacklistSelection and LibsFarmAssistant._blacklistSelection[key]
+								end,
+								set = function(_, key, val)
+									if not LibsFarmAssistant._blacklistSelection then
+										LibsFarmAssistant._blacklistSelection = {}
+									end
+									LibsFarmAssistant._blacklistSelection[key] = val or nil
+								end,
+							},
+							removeSelected = {
+								name = 'Remove Selected',
+								type = 'execute',
+								order = 2,
+								func = function()
+									if not LibsFarmAssistant._blacklistSelection then
+										return
+									end
+									for key in pairs(LibsFarmAssistant._blacklistSelection) do
+										LibsFarmAssistant.db.lootModules.blacklist[key] = nil
+									end
+									LibsFarmAssistant._blacklistSelection = nil
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+								end,
+							},
+							addHeader = {
+								name = 'Add Item',
+								type = 'header',
+								order = 10,
+							},
+							addItemID = {
+								name = 'Item ID',
+								desc = 'Enter an Item ID to add to the blacklist',
+								type = 'input',
+								order = 11,
+								get = function()
+									return newListItem.itemID
+								end,
+								set = function(_, val)
+									newListItem.itemID = val
+								end,
+							},
+							addButton = {
+								name = 'Add to Blacklist',
+								type = 'execute',
+								order = 12,
+								func = function()
+									local itemID = tonumber(newListItem.itemID)
+									if not itemID then
+										LibsFarmAssistant:Print('Invalid Item ID')
+										return
+									end
+									local itemName = C_Item.GetItemInfo(itemID)
+									LibsFarmAssistant.db.lootModules.blacklist[tostring(itemID)] = itemName or ('Item ' .. itemID)
+									if not itemName then
+										C_Item.RequestLoadItemDataByID(itemID)
+									end
+									newListItem.itemID = ''
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+								end,
+							},
+						},
+					},
+					alertList = {
+						name = 'Alert List',
+						type = 'group',
+						order = 5,
+						args = {
+							desc = {
+								name = 'Items on the alert list trigger a sound and raid warning when they drop. Alt+drag items onto the minimap button to add them.',
+								type = 'description',
+								order = 0,
+							},
+							list = {
+								name = 'Current Alert List',
+								type = 'multiselect',
+								order = 1,
+								width = 'full',
+								values = function()
+									local values = {}
+									for key, name in pairs(LibsFarmAssistant.db.lootModules.alertList) do
+										values[key] = name
+									end
+									return values
+								end,
+								get = function(_, key)
+									return LibsFarmAssistant._alertSelection and LibsFarmAssistant._alertSelection[key]
+								end,
+								set = function(_, key, val)
+									if not LibsFarmAssistant._alertSelection then
+										LibsFarmAssistant._alertSelection = {}
+									end
+									LibsFarmAssistant._alertSelection[key] = val or nil
+								end,
+							},
+							removeSelected = {
+								name = 'Remove Selected',
+								type = 'execute',
+								order = 2,
+								func = function()
+									if not LibsFarmAssistant._alertSelection then
+										return
+									end
+									for key in pairs(LibsFarmAssistant._alertSelection) do
+										LibsFarmAssistant.db.lootModules.alertList[key] = nil
+									end
+									LibsFarmAssistant._alertSelection = nil
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+								end,
+							},
+							addHeader = {
+								name = 'Add Item',
+								type = 'header',
+								order = 10,
+							},
+							addItemID = {
+								name = 'Item ID',
+								desc = 'Enter an Item ID to add to the alert list',
+								type = 'input',
+								order = 11,
+								get = function()
+									return newListItem.itemID
+								end,
+								set = function(_, val)
+									newListItem.itemID = val
+								end,
+							},
+							addButton = {
+								name = 'Add to Alert List',
+								type = 'execute',
+								order = 12,
+								func = function()
+									local itemID = tonumber(newListItem.itemID)
+									if not itemID then
+										LibsFarmAssistant:Print('Invalid Item ID')
+										return
+									end
+									local itemName = C_Item.GetItemInfo(itemID)
+									LibsFarmAssistant.db.lootModules.alertList[tostring(itemID)] = itemName or ('Item ' .. itemID)
+									if not itemName then
+										C_Item.RequestLoadItemDataByID(itemID)
+									end
+									newListItem.itemID = ''
+									LibsFarmAssistant:InvalidateLootingModuleCache()
+									LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
+								end,
+							},
+						},
+					},
+					chatOutput = {
+						name = 'Chat Output',
+						type = 'group',
+						order = 6,
+						inline = true,
+						args = {
+							printLooted = {
+								name = 'Print Looted Items',
+								desc = 'Show a chat message for each item auto-looted',
+								type = 'toggle',
+								order = 1,
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.printLooted
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.printLooted = val
+								end,
+							},
+							printIgnored = {
+								name = 'Print Ignored Items',
+								desc = 'Show a chat message for items that were skipped by filters',
+								type = 'toggle',
+								order = 2,
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.printIgnored
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.printIgnored = val
+								end,
+							},
+							printReason = {
+								name = 'Show Reason',
+								desc = 'Include the reason (Quality, Whitelist, etc.) in chat output',
+								type = 'toggle',
+								order = 3,
+								get = function()
+									return LibsFarmAssistant.db.autoLoot.printReason
+								end,
+								set = function(_, val)
+									LibsFarmAssistant.db.autoLoot.printReason = val
+								end,
+							},
+						},
 					},
 				},
 			},

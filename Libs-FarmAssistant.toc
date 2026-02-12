@@ -37,6 +37,24 @@ Core\Notifications.lua
 Core\GoalTracker.lua
 Core\SmartSession.lua
 
+# Auto-Looting System
+Core\Looting\LootingModule.lua
+Core\Looting\LootingCore.lua
+Core\Looting\Modules\AlertList.lua
+Core\Looting\Modules\Locked.lua
+Core\Looting\Modules\WatchedItems.lua
+Core\Looting\Modules\Money.lua
+Core\Looting\Modules\Currency.lua
+Core\Looting\Modules\WhiteList.lua
+Core\Looting\Modules\BlackList.lua
+Core\Looting\Modules\IgnoreBOP.lua
+Core\Looting\Modules\Rarity.lua
+Core\Looting\Modules\Quest.lua
+Core\Looting\Modules\Token.lua
+Core\Looting\Modules\Price.lua
+Core\Looting\Modules\Fishing.lua
+Core\Looting\Modules\All.lua
+
 # UI
 UI\DataBroker.lua
 UI\Tooltip.lua

@@ -25,6 +25,7 @@ function LibsFarmAssistant:OnEnable()
 	-- Initialize subsystems
 	self:InitializeSession()
 	self:InitializeLootTracker()
+	self:InitializeLootingSystem()
 	self:InitializeMoneyTracker()
 	self:InitializeCurrencyTracker()
 	self:InitializeReputationTracker()

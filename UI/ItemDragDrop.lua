@@ -26,6 +26,11 @@ function LibsFarmAssistant:InitializeItemDragDrop()
 end
 
 ---Handle an item being dropped onto the minimap button
+---Modifier keys determine which list the item is added to:
+---  No modifier: Watched Items
+---  Shift: Whitelist (always auto-loot)
+---  Ctrl: Blacklist (never auto-loot)
+---  Alt: Alert List (sound + raid warning on drop)
 function LibsFarmAssistant:HandleItemDrop()
 	local cursorType, itemID = GetCursorInfo()
 	if cursorType ~= 'item' or not itemID then
@@ -34,14 +39,25 @@ function LibsFarmAssistant:HandleItemDrop()
 
 	ClearCursor()
 
+	-- Determine target list based on modifier keys
+	local targetList = 'watched'
+	if IsShiftKeyDown() then
+		targetList = 'whitelist'
+	elseif IsControlKeyDown() then
+		targetList = 'blacklist'
+	elseif IsAltKeyDown() then
+		targetList = 'alertList'
+	end
+
 	-- Get item info
 	local itemName, itemLink, itemQuality, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(itemID)
 	if not itemName then
 		-- Item info not yet cached, try again shortly
+		local listTarget = targetList
 		C_Timer.After(0.5, function()
 			local name, link, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
 			if name then
-				self:AddWatchedItem(itemID, name, link, quality, icon)
+				self:AddItemToList(listTarget, itemID, name, link, quality, icon)
 			else
 				self:Print('Could not retrieve item info. Try again.')
 			end
@@ -49,7 +65,43 @@ function LibsFarmAssistant:HandleItemDrop()
 		return
 	end
 
-	self:AddWatchedItem(itemID, itemName, itemLink, itemQuality, itemIcon)
+	self:AddItemToList(targetList, itemID, itemName, itemLink, itemQuality, itemIcon)
+end
+
+---Add an item to the specified list
+---@param listName string 'watched', 'whitelist', 'blacklist', or 'alertList'
+---@param itemID number
+---@param name string
+---@param link string
+---@param quality number
+---@param icon number|string
+function LibsFarmAssistant:AddItemToList(listName, itemID, name, link, quality, icon)
+	if listName == 'watched' then
+		self:AddWatchedItem(itemID, name, link, quality, icon)
+		return
+	end
+
+	-- Add to the appropriate loot module list
+	local list = self.db.lootModules and self.db.lootModules[listName]
+	if not list then
+		return
+	end
+
+	local key = tostring(itemID)
+	local listDisplayName = ({
+		whitelist = 'Whitelist',
+		blacklist = 'Blacklist',
+		alertList = 'Alert List',
+	})[listName] or listName
+
+	if list[key] then
+		self:Print(string.format('Already on %s: %s', listDisplayName, link or name))
+		return
+	end
+
+	list[key] = name
+	self:Print(string.format('Added to %s: %s', listDisplayName, link or name))
+	self:InvalidateLootingModuleCache()
 end
 
 ---Add an item to the watch list

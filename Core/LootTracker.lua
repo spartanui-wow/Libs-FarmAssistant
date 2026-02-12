@@ -34,6 +34,12 @@ function LibsFarmAssistant:OnLootReceived(event, text)
 		return
 	end
 
+	-- Deduplication: skip items that were just auto-looted (already recorded by LootingCore)
+	local dedupItemID = tonumber(itemLink:match('item:(%d+)'))
+	if dedupItemID and self.WasRecentlyAutoLooted and self:WasRecentlyAutoLooted(dedupItemID) then
+		return
+	end
+
 	-- Extract quantity (e.g., "x5" at the end)
 	local quantity = tonumber(text:match('x(%d+)')) or 1
 
