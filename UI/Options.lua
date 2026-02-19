@@ -72,6 +72,7 @@ function LibsFarmAssistant:InitializeOptions()
 	local options = {
 		name = "Lib's Farm Assistant",
 		type = 'group',
+		childGroups = 'tab',
 		args = {
 			session = {
 				name = 'Session',
@@ -205,6 +206,7 @@ function LibsFarmAssistant:InitializeOptions()
 				name = 'Auto-Looting',
 				type = 'group',
 				order = 2.5,
+				childGroups = 'tab',
 				args = {
 					general = {
 						name = 'General',
