@@ -37,14 +37,14 @@ function LibsFarmAssistant:CreatePopup()
 	-- Control frame: buttons + status + duration
 	local controlFrame = LibAT.UI.CreateControlFrame(window)
 
-	local pauseBtn = LibAT.UI.CreateButton(controlFrame, 100, 22, 'Pause', true)
+	local pauseBtn = LibAT.UI.CreateButton(controlFrame, 100, 22, 'Pause')
 	pauseBtn:SetPoint('LEFT', controlFrame, 'LEFT', 8, 0)
 	pauseBtn:SetScript('OnClick', function()
 		LibsFarmAssistant:ToggleSession()
 	end)
 	window.pauseBtn = pauseBtn
 
-	local resetBtn = LibAT.UI.CreateButton(controlFrame, 80, 22, 'Reset', true)
+	local resetBtn = LibAT.UI.CreateButton(controlFrame, 80, 22, 'Reset')
 	resetBtn:SetPoint('LEFT', pauseBtn, 'RIGHT', 6, 0)
 	resetBtn:SetScript('OnClick', function()
 		StaticPopup_Show('LIBSFA_RESET_SESSION')
