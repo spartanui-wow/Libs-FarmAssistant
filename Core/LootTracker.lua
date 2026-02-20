@@ -26,6 +26,10 @@ function LibsFarmAssistant:OnLootReceived(event, text)
 		return
 	end
 
+	if not text or not canaccessvalue(text) then
+		return
+	end
+
 	-- Only track loot received by the player
 	-- Pattern: "You receive loot: |cff...|Hitem:ID:...|h[Name]|h|r"
 	-- Also: "You receive item: ..."

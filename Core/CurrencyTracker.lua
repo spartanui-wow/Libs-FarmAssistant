@@ -15,6 +15,10 @@ function LibsFarmAssistant:OnCurrencyReceived(event, text)
 		return
 	end
 
+	if not text or not canaccessvalue(text) then
+		return
+	end
+
 	-- Currency messages contain currency links: |cff...|Hcurrency:ID:AMOUNT|h[Name]|h|r
 	local currencyLink = text:match('|c%x+|Hcurrency:%d+[:%d]*|h%[.-%]|h|r')
 	if not currencyLink then

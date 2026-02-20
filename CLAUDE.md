@@ -171,10 +171,10 @@ Configurable in options: `items` | `money` | `combined`
 
 | Button | Action |
 |--------|--------|
-| Left Click | Toggle pause/resume |
-| Shift+Left | Open Options |
-| Right Click | Open Options |
-| Middle Click | Reset session |
+| Left Click | Open Dashboard |
+| Right Click | Pause/Resume session |
+| Shift+Click (either) | Reset session (with confirmation) |
+| Scroll Wheel | Cycle display format (items/money/combined) |
 
 ## Slash Commands
 

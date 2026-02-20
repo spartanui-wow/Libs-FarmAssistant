@@ -15,6 +15,10 @@ function LibsFarmAssistant:OnHonorGained(event, text)
 		return
 	end
 
+	if not text or not canaccessvalue(text) then
+		return
+	end
+
 	-- Pattern: "PlayerName dies, honorable kill Rank: Whatever (X honor)"
 	-- Also: "You have been awarded X honor."
 	local amount = tonumber(text:match('(%d+) [Hh]onor'))

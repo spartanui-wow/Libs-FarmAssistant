@@ -6,12 +6,17 @@ local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 -- Built with LibAT.UI (matching Libs-TimePlayed style)
 ----------------------------------------------------------------------------------------------------
 
-local popupFrame
 local updateTimer
+local popupFrame
 
 ---Create the popup window frame using LibAT.UI
 ---@return Frame|nil
 function LibsFarmAssistant:CreatePopup()
+	-- Recover existing named frame after /rl (file-local resets but _G frame persists)
+	if not popupFrame and _G['LibsFarmAssistantPopup'] then
+		popupFrame = _G['LibsFarmAssistantPopup']
+	end
+
 	if popupFrame then
 		return popupFrame
 	end
