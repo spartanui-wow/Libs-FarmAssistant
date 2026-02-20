@@ -1,12 +1,16 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
+---@class LibsFarmAssistant.SessionHistory : AceModule, AceEvent-3.0, AceTimer-3.0
+local SessionHistory = LibsFarmAssistant:NewModule('SessionHistory')
+LibsFarmAssistant.SessionHistory = SessionHistory
+
 local MAX_HISTORY = 20
 local MIN_SESSION_DURATION = 60 -- seconds
 
-function LibsFarmAssistant:InitializeSessionHistory()
+function SessionHistory:OnEnable()
 	-- Ensure history tables exist (backward compat)
-	local char = self.dbobj.char
+	local char = LibsFarmAssistant.dbobj.char
 	if not char.history then
 		char.history = {}
 	end
@@ -16,27 +20,24 @@ function LibsFarmAssistant:InitializeSessionHistory()
 end
 
 ---Save the current session to history before reset
-function LibsFarmAssistant:SaveSessionToHistory()
-	local session = self.session
-	local duration = self:GetSessionDuration()
+function SessionHistory:SaveSessionToHistory()
+	local session = LibsFarmAssistant.session
+	local duration = LibsFarmAssistant:GetSessionDuration()
 
-	-- Don't save very short sessions or empty sessions
 	if duration < MIN_SESSION_DURATION then
 		return
 	end
 
-	local _, totalItems = self:GetItemCounts()
+	local _, totalItems = LibsFarmAssistant:GetItemCounts()
 	local honor = session.honor or 0
-	local vendorValue = self:GetTotalVendorValue()
+	local vendorValue = LibsFarmAssistant:GetTotalVendorValue()
 
-	-- Check if session has any data worth saving
 	if totalItems == 0 and session.money == 0 and honor == 0 then
 		return
 	end
 
 	local hours = duration / 3600
 
-	-- Build simplified items list (no links/icons for storage efficiency)
 	local simplifiedItems = {}
 	for key, item in pairs(session.items) do
 		simplifiedItems[key] = {
@@ -47,13 +48,11 @@ function LibsFarmAssistant:SaveSessionToHistory()
 		}
 	end
 
-	-- Build simplified currencies list (counts only)
 	local simplifiedCurrencies = {}
 	for name, data in pairs(session.currencies) do
 		simplifiedCurrencies[name] = data.count
 	end
 
-	-- Create snapshot
 	local snapshot = {
 		timestamp = time(),
 		duration = duration,
@@ -64,34 +63,30 @@ function LibsFarmAssistant:SaveSessionToHistory()
 		reputation = {},
 		honor = honor,
 		totalVendorValue = vendorValue,
-		-- Computed rates for easy access
 		itemsPerHour = hours > 0 and (totalItems / hours) or 0,
 		goldPerHour = hours > 0 and (session.money / hours) or 0,
 		honorPerHour = hours > 0 and (honor / hours) or 0,
 	}
 
-	-- Copy reputation
 	for faction, gained in pairs(session.reputation) do
 		snapshot.reputation[faction] = gained
 	end
 
-	-- Insert at front, trim to max
-	local history = self.dbobj.char.history
+	local history = LibsFarmAssistant.dbobj.char.history
 	table.insert(history, 1, snapshot)
 	while #history > MAX_HISTORY do
 		table.remove(history)
 	end
 
-	-- Update personal bests
 	self:UpdateBestRates(snapshot)
 
-	self:Log('Session saved to history', 'info')
+	LibsFarmAssistant:Log('Session saved to history', 'info')
 end
 
 ---Update personal best rates if current snapshot exceeds them
 ---@param snapshot table
-function LibsFarmAssistant:UpdateBestRates(snapshot)
-	local bests = self.dbobj.char.bestRates
+function SessionHistory:UpdateBestRates(snapshot)
+	local bests = LibsFarmAssistant.dbobj.char.bestRates
 
 	if snapshot.itemsPerHour > bests.itemsPerHour then
 		bests.itemsPerHour = snapshot.itemsPerHour
@@ -106,8 +101,8 @@ end
 
 ---Get historical averages across all saved sessions
 ---@return table averages { itemsPerHour, goldPerHour, honorPerHour, sessionCount }
-function LibsFarmAssistant:GetHistoryAverages()
-	local history = self.dbobj.char.history
+function SessionHistory:GetHistoryAverages()
+	local history = LibsFarmAssistant.dbobj.char.history
 	local result = { itemsPerHour = 0, goldPerHour = 0, honorPerHour = 0, sessionCount = #history }
 
 	if #history == 0 then
@@ -129,4 +124,18 @@ function LibsFarmAssistant:GetHistoryAverages()
 	result.honorPerHour = totalHonorRate / #history
 
 	return result
+end
+
+-- Bridge methods on main addon
+function LibsFarmAssistant:SaveSessionToHistory()
+	if self.SessionHistory then
+		self.SessionHistory:SaveSessionToHistory()
+	end
+end
+
+function LibsFarmAssistant:GetHistoryAverages()
+	if self.SessionHistory then
+		return self.SessionHistory:GetHistoryAverages()
+	end
+	return { itemsPerHour = 0, goldPerHour = 0, honorPerHour = 0, sessionCount = 0 }
 end

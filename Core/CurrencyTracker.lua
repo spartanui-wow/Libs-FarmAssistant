@@ -1,17 +1,25 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-function LibsFarmAssistant:InitializeCurrencyTracker()
-	if self.db.tracking.currency then
+---@class LibsFarmAssistant.CurrencyTracker : AceModule, AceEvent-3.0, AceTimer-3.0
+local CurrencyTracker = LibsFarmAssistant:NewModule('CurrencyTracker')
+LibsFarmAssistant.CurrencyTracker = CurrencyTracker
+
+function CurrencyTracker:OnEnable()
+	if LibsFarmAssistant.db.tracking.currency then
 		self:RegisterEvent('CHAT_MSG_CURRENCY', 'OnCurrencyReceived')
 	end
+end
+
+function CurrencyTracker:OnDisable()
+	self:UnregisterAllEvents()
 end
 
 ---Handle CHAT_MSG_CURRENCY event
 ---@param event string
 ---@param text string Chat message text
-function LibsFarmAssistant:OnCurrencyReceived(event, text)
-	if not self:IsSessionActive() then
+function CurrencyTracker:OnCurrencyReceived(event, text)
+	if not LibsFarmAssistant:IsSessionActive() then
 		return
 	end
 
@@ -19,22 +27,18 @@ function LibsFarmAssistant:OnCurrencyReceived(event, text)
 		return
 	end
 
-	-- Currency messages contain currency links: |cff...|Hcurrency:ID:AMOUNT|h[Name]|h|r
 	local currencyLink = text:match('|c%x+|Hcurrency:%d+[:%d]*|h%[.-%]|h|r')
 	if not currencyLink then
 		return
 	end
 
-	-- Extract name from link
 	local currencyName = currencyLink:match('%[(.-)%]')
 	if not currencyName then
 		return
 	end
 
-	-- Extract quantity
 	local quantity = tonumber(text:match('x(%d+)')) or 1
 
-	-- Extract currency icon if possible
 	local currencyID = tonumber(currencyLink:match('currency:(%d+)'))
 	local icon
 	if currencyID then
@@ -44,8 +48,7 @@ function LibsFarmAssistant:OnCurrencyReceived(event, text)
 		end
 	end
 
-	-- Record
-	local currencies = self.session.currencies
+	local currencies = LibsFarmAssistant.session.currencies
 	if currencies[currencyName] then
 		currencies[currencyName].count = currencies[currencyName].count + quantity
 	else
@@ -56,10 +59,10 @@ function LibsFarmAssistant:OnCurrencyReceived(event, text)
 		}
 	end
 
-	self:Log(string.format('Currency: %s x%d', currencyName, quantity), 'debug')
-	self:UpdateDisplay()
+	LibsFarmAssistant:Log(string.format('Currency: %s x%d', currencyName, quantity), 'debug')
+	LibsFarmAssistant:UpdateDisplay()
 
-	if self.db.chatEcho then
-		self:Print(string.format('[Farm] %s x%d', currencyName, quantity))
+	if LibsFarmAssistant.db.chatEcho then
+		LibsFarmAssistant:Print(string.format('[Farm] %s x%d', currencyName, quantity))
 	end
 end

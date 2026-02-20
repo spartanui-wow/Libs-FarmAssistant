@@ -1,13 +1,11 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-----------------------------------------------------------------------------------------------------
--- Drag-and-Drop Item Tracking
--- Drag items from bags onto the minimap button to add them to the watch list
-----------------------------------------------------------------------------------------------------
+---@class LibsFarmAssistant.ItemDragDrop : AceModule, AceEvent-3.0, AceTimer-3.0
+local ItemDragDrop = LibsFarmAssistant:NewModule('ItemDragDrop')
+LibsFarmAssistant.ItemDragDrop = ItemDragDrop
 
-function LibsFarmAssistant:InitializeItemDragDrop()
-	-- Hook the minimap button to accept item drops
+function ItemDragDrop:OnEnable()
 	local LibDBIcon = LibStub('LibDBIcon-1.0', true)
 	if not LibDBIcon then
 		return
@@ -22,7 +20,7 @@ function LibsFarmAssistant:InitializeItemDragDrop()
 		self:HandleItemDrop()
 	end)
 
-	self:Log('Item drag-drop initialized', 'debug')
+	LibsFarmAssistant:Log('Item drag-drop initialized', 'debug')
 end
 
 ---Handle an item being dropped onto the minimap button
@@ -31,7 +29,7 @@ end
 ---  Shift: Whitelist (always auto-loot)
 ---  Ctrl: Blacklist (never auto-loot)
 ---  Alt: Alert List (sound + raid warning on drop)
-function LibsFarmAssistant:HandleItemDrop()
+function ItemDragDrop:HandleItemDrop()
 	local cursorType, itemID = GetCursorInfo()
 	if cursorType ~= 'item' or not itemID then
 		return
@@ -39,7 +37,6 @@ function LibsFarmAssistant:HandleItemDrop()
 
 	ClearCursor()
 
-	-- Determine target list based on modifier keys
 	local targetList = 'watched'
 	if IsShiftKeyDown() then
 		targetList = 'whitelist'
@@ -49,23 +46,21 @@ function LibsFarmAssistant:HandleItemDrop()
 		targetList = 'alertList'
 	end
 
-	-- Get item info
 	local itemName, itemLink, itemQuality, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(itemID)
 	if not itemName then
-		-- Item info not yet cached, try again shortly
 		local listTarget = targetList
 		C_Timer.After(0.5, function()
 			local name, link, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
 			if name then
-				self:AddItemToList(listTarget, itemID, name, link, quality, icon)
+				LibsFarmAssistant:AddItemToList(listTarget, itemID, name, link, quality, icon)
 			else
-				self:Print('Could not retrieve item info. Try again.')
+				LibsFarmAssistant:Print('Could not retrieve item info. Try again.')
 			end
 		end)
 		return
 	end
 
-	self:AddItemToList(targetList, itemID, itemName, itemLink, itemQuality, itemIcon)
+	LibsFarmAssistant:AddItemToList(targetList, itemID, itemName, itemLink, itemQuality, itemIcon)
 end
 
 ---Add an item to the specified list
@@ -75,14 +70,13 @@ end
 ---@param link string
 ---@param quality number
 ---@param icon number|string
-function LibsFarmAssistant:AddItemToList(listName, itemID, name, link, quality, icon)
+function ItemDragDrop:AddItemToList(listName, itemID, name, link, quality, icon)
 	if listName == 'watched' then
 		self:AddWatchedItem(itemID, name, link, quality, icon)
 		return
 	end
 
-	-- Add to the appropriate loot module list
-	local list = self.db.lootModules and self.db.lootModules[listName]
+	local list = LibsFarmAssistant.db.lootModules and LibsFarmAssistant.db.lootModules[listName]
 	if not list then
 		return
 	end
@@ -95,13 +89,13 @@ function LibsFarmAssistant:AddItemToList(listName, itemID, name, link, quality, 
 	})[listName] or listName
 
 	if list[key] then
-		self:Print(string.format('Already on %s: %s', listDisplayName, link or name))
+		LibsFarmAssistant:Print(string.format('Already on %s: %s', listDisplayName, link or name))
 		return
 	end
 
 	list[key] = name
-	self:Print(string.format('Added to %s: %s', listDisplayName, link or name))
-	self:InvalidateLootingModuleCache()
+	LibsFarmAssistant:Print(string.format('Added to %s: %s', listDisplayName, link or name))
+	LibsFarmAssistant:InvalidateLootingModuleCache()
 end
 
 ---Add an item to the watch list
@@ -110,19 +104,19 @@ end
 ---@param link string
 ---@param quality number
 ---@param icon number|string
-function LibsFarmAssistant:AddWatchedItem(itemID, name, link, quality, icon)
-	if not self.session.watchedItems then
-		self.session.watchedItems = {}
+function ItemDragDrop:AddWatchedItem(itemID, name, link, quality, icon)
+	if not LibsFarmAssistant.session.watchedItems then
+		LibsFarmAssistant.session.watchedItems = {}
 	end
 
 	local key = tostring(itemID)
 
-	if self.session.watchedItems[key] then
-		self:Print('Already watching: ' .. (link or name))
+	if LibsFarmAssistant.session.watchedItems[key] then
+		LibsFarmAssistant:Print('Already watching: ' .. (link or name))
 		return
 	end
 
-	self.session.watchedItems[key] = {
+	LibsFarmAssistant.session.watchedItems[key] = {
 		itemID = itemID,
 		name = name,
 		link = link,
@@ -130,28 +124,54 @@ function LibsFarmAssistant:AddWatchedItem(itemID, name, link, quality, icon)
 		quality = quality or 1,
 	}
 
-	self:Print('Now watching: ' .. (link or name))
-	self:UpdateDisplay()
+	LibsFarmAssistant:Print('Now watching: ' .. (link or name))
+	LibsFarmAssistant:UpdateDisplay()
 end
 
 ---Remove an item from the watch list
 ---@param itemID number|string
-function LibsFarmAssistant:UnwatchItem(itemID)
-	if not self.session.watchedItems then
+function ItemDragDrop:UnwatchItem(itemID)
+	if not LibsFarmAssistant.session.watchedItems then
 		return
 	end
 
 	local key = tostring(itemID)
-	local item = self.session.watchedItems[key]
+	local item = LibsFarmAssistant.session.watchedItems[key]
 	if item then
-		self:Print('Stopped watching: ' .. (item.link or item.name or key))
-		self.session.watchedItems[key] = nil
-		self:UpdateDisplay()
+		LibsFarmAssistant:Print('Stopped watching: ' .. (item.link or item.name or key))
+		LibsFarmAssistant.session.watchedItems[key] = nil
+		LibsFarmAssistant:UpdateDisplay()
 	end
 end
 
 ---Get the watched items table
 ---@return table watchedItems
+function ItemDragDrop:GetWatchedItems()
+	return LibsFarmAssistant.session.watchedItems or {}
+end
+
+-- Bridge methods
+function LibsFarmAssistant:AddItemToList(listName, itemID, name, link, quality, icon)
+	if self.ItemDragDrop then
+		self.ItemDragDrop:AddItemToList(listName, itemID, name, link, quality, icon)
+	end
+end
+
+function LibsFarmAssistant:AddWatchedItem(itemID, name, link, quality, icon)
+	if self.ItemDragDrop then
+		self.ItemDragDrop:AddWatchedItem(itemID, name, link, quality, icon)
+	end
+end
+
+function LibsFarmAssistant:UnwatchItem(itemID)
+	if self.ItemDragDrop then
+		self.ItemDragDrop:UnwatchItem(itemID)
+	end
+end
+
 function LibsFarmAssistant:GetWatchedItems()
-	return self.session.watchedItems or {}
+	if self.ItemDragDrop then
+		return self.ItemDragDrop:GetWatchedItems()
+	end
+	return {}
 end

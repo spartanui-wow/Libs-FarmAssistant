@@ -1,6 +1,10 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
+---@class LibsFarmAssistant.Options : AceModule, AceEvent-3.0, AceTimer-3.0
+local Options = LibsFarmAssistant:NewModule('Options')
+LibsFarmAssistant.Options = Options
+
 -- Temporary state for new list item inputs
 local newListItem = {
 	itemID = '',
@@ -26,7 +30,6 @@ local function BuildGoalListArgs()
 	for i, goal in ipairs(goals) do
 		local goalKey = 'goal' .. i
 
-		-- Goal name/description
 		local goalName
 		if goal.type == 'item' then
 			goalName = string.format('#%d: Item %s (target: %s)', i, goal.targetName or tostring(goal.targetItemID), BreakUpLargeNumbers(goal.targetValue))
@@ -59,7 +62,7 @@ local function BuildGoalListArgs()
 			confirmText = 'Remove this goal?',
 			func = function()
 				table.remove(goals, i)
-				LibsFarmAssistant:RefreshGoalOptions()
+				Options:RefreshGoalOptions()
 				LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
 			end,
 		}
@@ -68,7 +71,7 @@ local function BuildGoalListArgs()
 	return args
 end
 
-function LibsFarmAssistant:InitializeOptions()
+function Options:OnEnable()
 	local options = {
 		name = "Lib's Farm Assistant",
 		type = 'group',
@@ -226,12 +229,15 @@ function LibsFarmAssistant:InitializeOptions()
 								set = function(_, val)
 									LibsFarmAssistant.db.autoLoot.enabled = val
 									LibsFarmAssistant:InvalidateLootingModuleCache()
-									-- Re-register or unregister loot events
-									LibsFarmAssistant:UnregisterEvent('LOOT_READY')
-									LibsFarmAssistant:UnregisterEvent('LOOT_OPENED')
-									if val then
-										local event = LibsFarmAssistant.db.autoLoot.fastLoot and 'LOOT_READY' or 'LOOT_OPENED'
-										LibsFarmAssistant:RegisterEvent(event, 'OnLootWindowReady')
+									-- Re-register or unregister loot events on LootingCore module
+									local lootingCore = LibsFarmAssistant.LootingCore
+									if lootingCore then
+										lootingCore:UnregisterEvent('LOOT_READY')
+										lootingCore:UnregisterEvent('LOOT_OPENED')
+										if val then
+											local event = LibsFarmAssistant.db.autoLoot.fastLoot and 'LOOT_READY' or 'LOOT_OPENED'
+											lootingCore:RegisterEvent(event, 'OnLootWindowReady')
+										end
 									end
 								end,
 							},
@@ -248,12 +254,12 @@ function LibsFarmAssistant:InitializeOptions()
 								end,
 								set = function(_, val)
 									LibsFarmAssistant.db.autoLoot.fastLoot = val
-									-- Switch events
-									if LibsFarmAssistant.db.autoLoot.enabled then
-										LibsFarmAssistant:UnregisterEvent('LOOT_READY')
-										LibsFarmAssistant:UnregisterEvent('LOOT_OPENED')
+									local lootingCore = LibsFarmAssistant.LootingCore
+									if lootingCore and LibsFarmAssistant.db.autoLoot.enabled then
+										lootingCore:UnregisterEvent('LOOT_READY')
+										lootingCore:UnregisterEvent('LOOT_OPENED')
 										local event = val and 'LOOT_READY' or 'LOOT_OPENED'
-										LibsFarmAssistant:RegisterEvent(event, 'OnLootWindowReady')
+										lootingCore:RegisterEvent(event, 'OnLootWindowReady')
 									end
 								end,
 							},
@@ -828,8 +834,14 @@ function LibsFarmAssistant:InitializeOptions()
 						end,
 						set = function(_, val)
 							LibsFarmAssistant.db.smartSession.enabled = val
-							if val then
-								LibsFarmAssistant:InitializeSmartSession()
+							local smartSession = LibsFarmAssistant.SmartSession
+							if smartSession then
+								if val then
+									smartSession:RegisterEvent('CHAT_MSG_LOOT', 'SmartSessionLootCheck')
+									smartSession:RegisterEvent('PLAYER_FLAGS_CHANGED', 'SmartSessionAFKCheck')
+								else
+									smartSession:UnregisterAllEvents()
+								end
 							end
 						end,
 					},
@@ -1024,7 +1036,6 @@ function LibsFarmAssistant:InitializeOptions()
 							}
 
 							if newGoal.type == 'money' then
-								-- Convert gold input to copper
 								goal.targetValue = newGoal.targetValue * 10000
 							elseif newGoal.type == 'item' then
 								local itemID = tonumber(newGoal.targetItemID)
@@ -1033,7 +1044,6 @@ function LibsFarmAssistant:InitializeOptions()
 									return
 								end
 								goal.targetItemID = itemID
-								-- Try to resolve name
 								local itemName = C_Item.GetItemInfo(itemID)
 								goal.targetName = itemName or ('Item ' .. itemID)
 								if not itemName then
@@ -1049,7 +1059,7 @@ function LibsFarmAssistant:InitializeOptions()
 
 							table.insert(LibsFarmAssistant.db.goals, goal)
 							LibsFarmAssistant:Print(string.format('Goal added: %s', goal.targetName or goal.type))
-							LibsFarmAssistant:RefreshGoalOptions()
+							Options:RefreshGoalOptions()
 							LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
 						end,
 					},
@@ -1063,7 +1073,6 @@ function LibsFarmAssistant:InitializeOptions()
 		},
 	}
 
-	-- Store reference for dynamic goal list injection
 	self.optionsTable = options
 	self:RefreshGoalOptions()
 
@@ -1072,30 +1081,34 @@ function LibsFarmAssistant:InitializeOptions()
 end
 
 ---Rebuild the dynamic goal list entries in the options table
-function LibsFarmAssistant:RefreshGoalOptions()
+function Options:RefreshGoalOptions()
 	if not self.optionsTable then
 		return
 	end
 
 	local goalsArgs = self.optionsTable.args.goals.args
 
-	-- Remove old dynamic entries
 	for key in pairs(goalsArgs) do
 		if key:match('^goal%d') then
 			goalsArgs[key] = nil
 		end
 	end
 
-	-- Add current goals
 	local dynamicArgs = BuildGoalListArgs()
 	for key, val in pairs(dynamicArgs) do
-		-- Offset orders by 100 to be after the static entries
 		val.order = val.order + 100
 		goalsArgs[key] = val
 	end
 end
 
-function LibsFarmAssistant:OpenOptions()
+function Options:OpenOptions()
 	self:RefreshGoalOptions()
 	LibStub('AceConfigDialog-3.0'):Open('LibsFarmAssistant')
+end
+
+-- Bridge methods
+function LibsFarmAssistant:RefreshGoalOptions()
+	if self.Options then
+		self.Options:RefreshGoalOptions()
+	end
 end

@@ -1,9 +1,11 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-local LDB = LibStub('LibDataBroker-1.1')
+---@class LibsFarmAssistant.DataBroker : AceModule, AceEvent-3.0, AceTimer-3.0
+local DataBroker = LibsFarmAssistant:NewModule('DataBroker')
+LibsFarmAssistant.DataBroker = DataBroker
 
-local dataObj
+local LDB = LibStub('LibDataBroker-1.1')
 
 -- Reset confirmation dialog (shared with PopupWindow)
 StaticPopupDialogs['LIBSFA_RESET_SESSION'] = {
@@ -39,21 +41,18 @@ local function CycleDisplayFormat(direction)
 	LibsFarmAssistant:UpdateDisplay()
 end
 
-function LibsFarmAssistant:InitializeDataBroker()
-	dataObj = LDB:NewDataObject("Lib's FarmAssistant", {
+function DataBroker:OnEnable()
+	self.dataObj = LDB:NewDataObject("Lib's FarmAssistant", {
 		type = 'data source',
 		text = 'Ready',
 		icon = 'Interface\\Icons\\INV_Misc_Coin_03',
 		label = 'Farm Assistant',
 		OnClick = function(frame, button)
 			if IsShiftKeyDown() then
-				-- Shift+Click (either button): Reset with confirmation
 				StaticPopup_Show('LIBSFA_RESET_SESSION')
 			elseif button == 'LeftButton' then
-				-- Left: Open Dashboard
 				LibsFarmAssistant:TogglePopup()
 			elseif button == 'RightButton' then
-				-- Right: Pause/Resume
 				LibsFarmAssistant:ToggleSession()
 			end
 		end,
@@ -61,63 +60,58 @@ function LibsFarmAssistant:InitializeDataBroker()
 			LibsFarmAssistant:BuildTooltip(tooltip)
 		end,
 		OnScrollWheel = function(_, delta)
-			-- Scroll up (delta > 0) = previous format, scroll down = next format
 			CycleDisplayFormat(delta > 0 and -1 or 1)
 		end,
 	})
 
-	self.dataObject = dataObj
+	LibsFarmAssistant.dataObject = self.dataObj
 	self:UpdateDisplay()
 end
 
-function LibsFarmAssistant:UpdateDisplay()
-	if not dataObj then
+function DataBroker:UpdateDisplay()
+	if not self.dataObj then
 		return
 	end
 
 	-- Check for session notifications and goal completion
-	if self.CheckSessionNotification then
-		self:CheckSessionNotification()
-	end
-	if self.CheckGoalCompletion then
-		self:CheckGoalCompletion()
-	end
+	LibsFarmAssistant:CheckSessionNotification()
+	LibsFarmAssistant:CheckGoalCompletion()
 
-	if not self:IsSessionActive() then
-		dataObj.text = '|cff808080Paused|r'
+	if not LibsFarmAssistant:IsSessionActive() then
+		self.dataObj.text = '|cff808080Paused|r'
 		return
 	end
 
-	local format = self.db.display.format
-	local hours = self:GetSessionHours()
+	local format = LibsFarmAssistant.db.display.format
+	local hours = LibsFarmAssistant:GetSessionHours()
 
 	if format == 'money' then
-		if self.session.money > 0 then
-			dataObj.text = self:FormatMoney(self.session.money)
+		if LibsFarmAssistant.session.money > 0 then
+			self.dataObj.text = LibsFarmAssistant:FormatMoney(LibsFarmAssistant.session.money)
 		else
-			dataObj.text = '0g'
+			self.dataObj.text = '0g'
 		end
 	elseif format == 'combined' then
-		local _, totalItems = self:GetItemCounts()
+		local _, totalItems = LibsFarmAssistant:GetItemCounts()
 		local parts = {}
 		if totalItems > 0 then
-			table.insert(parts, self:FormatNumber(totalItems) .. ' items')
+			table.insert(parts, LibsFarmAssistant:FormatNumber(totalItems) .. ' items')
 		end
-		if self.session.money > 0 then
-			table.insert(parts, self:FormatMoney(self.session.money))
+		if LibsFarmAssistant.session.money > 0 then
+			table.insert(parts, LibsFarmAssistant:FormatMoney(LibsFarmAssistant.session.money))
 		end
 		if #parts > 0 then
-			dataObj.text = table.concat(parts, ' | ')
+			self.dataObj.text = table.concat(parts, ' | ')
 		else
-			dataObj.text = 'Farming...'
+			self.dataObj.text = 'Farming...'
 		end
 	else -- 'items'
-		local _, totalItems = self:GetItemCounts()
+		local _, totalItems = LibsFarmAssistant:GetItemCounts()
 		if totalItems > 0 then
 			local rate = hours > 0 and string.format(' (%.0f/hr)', totalItems / hours) or ''
-			dataObj.text = self:FormatNumber(totalItems) .. ' items' .. rate
+			self.dataObj.text = LibsFarmAssistant:FormatNumber(totalItems) .. ' items' .. rate
 		else
-			dataObj.text = 'Farming...'
+			self.dataObj.text = 'Farming...'
 		end
 	end
 end

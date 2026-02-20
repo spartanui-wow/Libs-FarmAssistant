@@ -1,17 +1,16 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-----------------------------------------------------------------------------------------------------
--- Session Dashboard Popup Window
--- Built with LibAT.UI (matching Libs-TimePlayed style)
-----------------------------------------------------------------------------------------------------
+---@class LibsFarmAssistant.PopupWindow : AceModule, AceEvent-3.0, AceTimer-3.0
+local PopupWindow = LibsFarmAssistant:NewModule('PopupWindow')
+LibsFarmAssistant.PopupWindow = PopupWindow
 
 local updateTimer
 local popupFrame
 
 ---Create the popup window frame using LibAT.UI
 ---@return Frame|nil
-function LibsFarmAssistant:CreatePopup()
+function PopupWindow:CreatePopup()
 	-- Recover existing named frame after /rl (file-local resets but _G frame persists)
 	if not popupFrame and _G['LibsFarmAssistantPopup'] then
 		popupFrame = _G['LibsFarmAssistantPopup']
@@ -22,11 +21,11 @@ function LibsFarmAssistant:CreatePopup()
 	end
 
 	if not LibAT or not LibAT.UI or not LibAT.UI.CreateWindow then
-		self:Log('LibAT.UI not available, cannot create popup window', 'error')
+		LibsFarmAssistant:Log('LibAT.UI not available, cannot create popup window', 'error')
 		return nil
 	end
 
-	local db = self.db.popup
+	local db = LibsFarmAssistant.db.popup
 
 	local window = LibAT.UI.CreateWindow({
 		name = 'LibsFarmAssistantPopup',
@@ -88,13 +87,13 @@ function LibsFarmAssistant:CreatePopup()
 	-- Save position/size on hide, stop update timer
 	window:HookScript('OnHide', function()
 		local point, _, _, x, y = window:GetPoint()
-		self.db.popup.point = point or 'CENTER'
-		self.db.popup.x = x or 0
-		self.db.popup.y = y or 0
-		self.db.popup.width = window:GetWidth()
-		self.db.popup.height = window:GetHeight()
+		LibsFarmAssistant.db.popup.point = point or 'CENTER'
+		LibsFarmAssistant.db.popup.x = x or 0
+		LibsFarmAssistant.db.popup.y = y or 0
+		LibsFarmAssistant.db.popup.width = window:GetWidth()
+		LibsFarmAssistant.db.popup.height = window:GetHeight()
 		if updateTimer then
-			self:CancelTimer(updateTimer)
+			PopupWindow:CancelTimer(updateTimer)
 			updateTimer = nil
 		end
 	end)
@@ -104,29 +103,27 @@ function LibsFarmAssistant:CreatePopup()
 end
 
 ---Build the content display inside the popup
-function LibsFarmAssistant:UpdatePopupContent()
+function PopupWindow:UpdatePopupContent()
 	if not popupFrame or not popupFrame:IsShown() then
 		return
 	end
 
-	local session = self.session
-	local hours = self:GetSessionHours()
-	local duration = self:GetSessionDuration()
-	local isActive = self:IsSessionActive()
+	local session = LibsFarmAssistant.session
+	local hours = LibsFarmAssistant:GetSessionHours()
+	local duration = LibsFarmAssistant:GetSessionDuration()
+	local isActive = LibsFarmAssistant:IsSessionActive()
 
-	-- Status and controls
 	popupFrame.statusText:SetText(isActive and '|cff00ff00Active|r' or '|cffff0000Paused|r')
 	popupFrame.pauseBtn:SetText(isActive and 'Pause' or 'Resume')
-	popupFrame.durationText:SetText(self:FormatDuration(duration))
+	popupFrame.durationText:SetText(LibsFarmAssistant:FormatDuration(duration))
 
-	-- Build content lines
 	local lines = {}
 
 	-- Items
-	local uniqueItems, totalItems = self:GetItemCounts()
+	local uniqueItems, totalItems = LibsFarmAssistant:GetItemCounts()
 	if totalItems > 0 then
 		local rate = hours > 0 and string.format(' (%.0f/hr)', totalItems / hours) or ''
-		table.insert(lines, string.format('|cffffd100Items:|r %s looted%s', self:FormatNumber(totalItems), rate))
+		table.insert(lines, string.format('|cffffd100Items:|r %s looted%s', LibsFarmAssistant:FormatNumber(totalItems), rate))
 
 		local sorted = {}
 		for _, item in pairs(session.items) do
@@ -138,12 +135,12 @@ function LibsFarmAssistant:UpdatePopupContent()
 
 		for _, item in ipairs(sorted) do
 			local rate2 = hours > 0 and string.format(' (%.1f/hr)', item.count / hours) or ''
-			table.insert(lines, string.format('  %s x%s%s', item.link or item.name, self:FormatNumber(item.count), rate2))
+			table.insert(lines, string.format('  %s x%s%s', item.link or item.name, LibsFarmAssistant:FormatNumber(item.count), rate2))
 		end
 	end
 
 	-- Watched items not yet looted
-	local watchedItems = self:GetWatchedItems()
+	local watchedItems = LibsFarmAssistant:GetWatchedItems()
 	for key, watchInfo in pairs(watchedItems) do
 		if not session.items[key] then
 			table.insert(lines, string.format('  |cff808080%s (watching)|r', watchInfo.link or watchInfo.name or '?'))
@@ -152,9 +149,9 @@ function LibsFarmAssistant:UpdatePopupContent()
 
 	-- Money
 	if session.money > 0 then
-		local goldRate = hours > 0 and string.format(' (%s/hr)', self:FormatMoney(session.money / hours)) or ''
+		local goldRate = hours > 0 and string.format(' (%s/hr)', LibsFarmAssistant:FormatMoney(session.money / hours)) or ''
 		table.insert(lines, '')
-		table.insert(lines, string.format('|cffffd100Money:|r %s%s', self:FormatMoney(session.money), goldRate))
+		table.insert(lines, string.format('|cffffd100Money:|r %s%s', LibsFarmAssistant:FormatMoney(session.money), goldRate))
 	end
 
 	-- Currencies
@@ -168,7 +165,7 @@ function LibsFarmAssistant:UpdatePopupContent()
 		table.insert(lines, '|cffffd100Currency:|r')
 		for name, data in pairs(session.currencies) do
 			local rate2 = hours > 0 and string.format(' (%.1f/hr)', data.count / hours) or ''
-			table.insert(lines, string.format('  %s x%s%s', name, self:FormatNumber(data.count), rate2))
+			table.insert(lines, string.format('  %s x%s%s', name, LibsFarmAssistant:FormatNumber(data.count), rate2))
 		end
 	end
 
@@ -183,7 +180,7 @@ function LibsFarmAssistant:UpdatePopupContent()
 		table.insert(lines, '|cffffd100Reputation:|r')
 		for faction, gained in pairs(session.reputation) do
 			local rate2 = hours > 0 and string.format(' (%.0f/hr)', gained / hours) or ''
-			table.insert(lines, string.format('  %s +%s%s', faction, self:FormatNumber(gained), rate2))
+			table.insert(lines, string.format('  %s +%s%s', faction, LibsFarmAssistant:FormatNumber(gained), rate2))
 		end
 	end
 
@@ -192,13 +189,13 @@ function LibsFarmAssistant:UpdatePopupContent()
 	if honor > 0 then
 		local honorRate = hours > 0 and string.format(' (%.0f/hr)', honor / hours) or ''
 		table.insert(lines, '')
-		table.insert(lines, string.format('|cffffd100Honor:|r %s%s', self:FormatNumber(honor), honorRate))
+		table.insert(lines, string.format('|cffffd100Honor:|r %s%s', LibsFarmAssistant:FormatNumber(honor), honorRate))
 	end
 
 	-- Goals
-	if self.db.goals and #self.db.goals > 0 then
+	if LibsFarmAssistant.db.goals and #LibsFarmAssistant.db.goals > 0 then
 		local hasActiveGoal = false
-		for _, goal in ipairs(self.db.goals) do
+		for _, goal in ipairs(LibsFarmAssistant.db.goals) do
 			if goal.active then
 				hasActiveGoal = true
 				break
@@ -207,11 +204,11 @@ function LibsFarmAssistant:UpdatePopupContent()
 		if hasActiveGoal then
 			table.insert(lines, '')
 			table.insert(lines, '|cffffd100Goals:|r')
-			for _, goal in ipairs(self.db.goals) do
+			for _, goal in ipairs(LibsFarmAssistant.db.goals) do
 				if goal.active then
-					local _, _, progress = self:GetGoalProgress(goal)
+					local _, _, progress = LibsFarmAssistant:GetGoalProgress(goal)
 					local pct = math.floor(progress * 100)
-					local bar = self:BuildProgressBar(progress, 15)
+					local bar = LibsFarmAssistant:BuildProgressBar(progress, 15)
 					local goalName = goal.targetName or goal.type
 
 					if progress >= 1 then
@@ -228,7 +225,6 @@ function LibsFarmAssistant:UpdatePopupContent()
 	local scrollChild = popupFrame.scrollChild
 	local fontStrings = scrollChild.fontStrings
 
-	-- Hide all existing strings first
 	for _, fs in ipairs(fontStrings) do
 		fs:Hide()
 	end
@@ -258,26 +254,25 @@ function LibsFarmAssistant:UpdatePopupContent()
 
 	-- Summary line
 	local summaryParts = {}
-	table.insert(summaryParts, 'Session: ' .. self:FormatDuration(duration))
+	table.insert(summaryParts, 'Session: ' .. LibsFarmAssistant:FormatDuration(duration))
 	if totalItems > 0 and hours > 0 then
-		table.insert(summaryParts, string.format('%s items/hr', self:FormatNumber(math.floor(totalItems / hours))))
+		table.insert(summaryParts, string.format('%s items/hr', LibsFarmAssistant:FormatNumber(math.floor(totalItems / hours))))
 	end
 	popupFrame.summaryText:SetText('|cffb3b3b3' .. table.concat(summaryParts, '  |  ') .. '|r')
 end
 
 ---Toggle the popup window visibility
-function LibsFarmAssistant:TogglePopup()
+function PopupWindow:TogglePopup()
 	local frame = self:CreatePopup()
 	if not frame then
-		self:Print("Dashboard requires Libs-AddonTools. Install it from CurseForge.")
+		LibsFarmAssistant:Print("Dashboard requires Libs-AddonTools. Install it from CurseForge.")
 		return
 	end
 
 	if frame:IsShown() then
 		frame:Hide()
 	else
-		-- Restore position and size
-		local db = self.db.popup
+		local db = LibsFarmAssistant.db.popup
 		frame:ClearAllPoints()
 		frame:SetPoint(db.point or 'CENTER', UIParent, db.point or 'CENTER', db.x or 0, db.y or 0)
 		frame:SetSize(db.width or 500, db.height or 400)
@@ -285,7 +280,6 @@ function LibsFarmAssistant:TogglePopup()
 		self:UpdatePopupContent()
 		frame:Show()
 
-		-- Start 1-second update timer
 		if not updateTimer then
 			updateTimer = self:ScheduleRepeatingTimer('UpdatePopupContent', 1)
 		end

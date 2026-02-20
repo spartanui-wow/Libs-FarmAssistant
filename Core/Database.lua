@@ -1,6 +1,10 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
+---@class LibsFarmAssistant.Database : AceModule
+local Database = LibsFarmAssistant:NewModule('Database')
+LibsFarmAssistant.Database = Database
+
 local defaults = {
 	char = {
 		session = {
@@ -88,15 +92,15 @@ local defaults = {
 	},
 }
 
-function LibsFarmAssistant:InitializeDatabase()
-	self.dbobj = LibStub('AceDB-3.0'):New('LibsFarmAssistantDB', defaults, true)
-	self.db = self.dbobj.profile
-	self.session = self.dbobj.char.session
+function Database:OnInitialize()
+	LibsFarmAssistant.dbobj = LibStub('AceDB-3.0'):New('LibsFarmAssistantDB', defaults, true)
+	LibsFarmAssistant.db = LibsFarmAssistant.dbobj.profile
+	LibsFarmAssistant.session = LibsFarmAssistant.dbobj.char.session
 
 	-- Profile callbacks
-	self.dbobj.RegisterCallback(self, 'OnProfileChanged', 'OnProfileChanged')
-	self.dbobj.RegisterCallback(self, 'OnProfileCopied', 'OnProfileChanged')
-	self.dbobj.RegisterCallback(self, 'OnProfileReset', 'OnProfileChanged')
+	LibsFarmAssistant.dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileChanged', 'OnProfileChanged')
+	LibsFarmAssistant.dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileCopied', 'OnProfileChanged')
+	LibsFarmAssistant.dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileReset', 'OnProfileChanged')
 end
 
 function LibsFarmAssistant:OnProfileChanged()
@@ -104,7 +108,5 @@ function LibsFarmAssistant:OnProfileChanged()
 	if self.InvalidateLootingModuleCache then
 		self:InvalidateLootingModuleCache()
 	end
-	if self.UpdateDisplay then
-		self:UpdateDisplay()
-	end
+	self:UpdateDisplay()
 end

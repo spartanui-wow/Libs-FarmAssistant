@@ -1,17 +1,25 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-function LibsFarmAssistant:InitializeHonorTracker()
-	if self.db.tracking.honor then
+---@class LibsFarmAssistant.HonorTracker : AceModule, AceEvent-3.0, AceTimer-3.0
+local HonorTracker = LibsFarmAssistant:NewModule('HonorTracker')
+LibsFarmAssistant.HonorTracker = HonorTracker
+
+function HonorTracker:OnEnable()
+	if LibsFarmAssistant.db.tracking.honor then
 		self:RegisterEvent('CHAT_MSG_COMBAT_HONOR_GAIN', 'OnHonorGained')
 	end
+end
+
+function HonorTracker:OnDisable()
+	self:UnregisterAllEvents()
 end
 
 ---Handle CHAT_MSG_COMBAT_HONOR_GAIN event
 ---@param event string
 ---@param text string Chat message text
-function LibsFarmAssistant:OnHonorGained(event, text)
-	if not self:IsSessionActive() then
+function HonorTracker:OnHonorGained(event, text)
+	if not LibsFarmAssistant:IsSessionActive() then
 		return
 	end
 
@@ -19,19 +27,17 @@ function LibsFarmAssistant:OnHonorGained(event, text)
 		return
 	end
 
-	-- Pattern: "PlayerName dies, honorable kill Rank: Whatever (X honor)"
-	-- Also: "You have been awarded X honor."
 	local amount = tonumber(text:match('(%d+) [Hh]onor'))
 	if not amount then
 		return
 	end
 
-	self.session.honor = (self.session.honor or 0) + amount
+	LibsFarmAssistant.session.honor = (LibsFarmAssistant.session.honor or 0) + amount
 
-	self:Log(string.format('Honor: +%d', amount), 'debug')
-	self:UpdateDisplay()
+	LibsFarmAssistant:Log(string.format('Honor: +%d', amount), 'debug')
+	LibsFarmAssistant:UpdateDisplay()
 
-	if self.db.chatEcho then
-		self:Print(string.format('[Farm] +%d honor', amount))
+	if LibsFarmAssistant.db.chatEcho then
+		LibsFarmAssistant:Print(string.format('[Farm] +%d honor', amount))
 	end
 end

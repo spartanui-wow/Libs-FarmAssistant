@@ -1,11 +1,14 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
--- Money snapshot for delta tracking
-local moneySnapshot = 0
+---@class LibsFarmAssistant.MoneyTracker : AceModule, AceEvent-3.0, AceTimer-3.0
+local MoneyTracker = LibsFarmAssistant:NewModule('MoneyTracker')
+LibsFarmAssistant.MoneyTracker = MoneyTracker
 
-function LibsFarmAssistant:InitializeMoneyTracker()
-	if self.db.tracking.money then
+function MoneyTracker:OnEnable()
+	self.moneySnapshot = 0
+
+	if LibsFarmAssistant.db.tracking.money then
 		self:RegisterEvent('PLAYER_MONEY', 'OnMoneyChanged')
 	end
 
@@ -13,33 +16,41 @@ function LibsFarmAssistant:InitializeMoneyTracker()
 	self:SnapshotMoney()
 end
 
+function MoneyTracker:OnDisable()
+	self:UnregisterAllEvents()
+end
+
 ---Take a snapshot of current money for delta tracking
-function LibsFarmAssistant:SnapshotMoney()
-	moneySnapshot = GetMoney()
+function MoneyTracker:SnapshotMoney()
+	self.moneySnapshot = GetMoney()
 end
 
 ---Handle PLAYER_MONEY event
-function LibsFarmAssistant:OnMoneyChanged()
-	if not self:IsSessionActive() then
-		-- Update snapshot so paused money changes don't count
-		moneySnapshot = GetMoney()
+function MoneyTracker:OnMoneyChanged()
+	if not LibsFarmAssistant:IsSessionActive() then
+		self.moneySnapshot = GetMoney()
 		return
 	end
 
 	local currentMoney = GetMoney()
-	local delta = currentMoney - moneySnapshot
+	local delta = currentMoney - self.moneySnapshot
 
-	-- Only track gains, not spending
 	if delta > 0 then
-		self.session.money = self.session.money + delta
-		self:Log(string.format('Money gained: %s', self:FormatMoney(delta)), 'debug')
-		self:UpdateDisplay()
+		LibsFarmAssistant.session.money = LibsFarmAssistant.session.money + delta
+		LibsFarmAssistant:Log(string.format('Money gained: %s', LibsFarmAssistant:FormatMoney(delta)), 'debug')
+		LibsFarmAssistant:UpdateDisplay()
 
-		if self.db.chatEcho then
-			self:Print(string.format('[Farm] +%s', self:FormatMoney(delta)))
+		if LibsFarmAssistant.db.chatEcho then
+			LibsFarmAssistant:Print(string.format('[Farm] +%s', LibsFarmAssistant:FormatMoney(delta)))
 		end
 	end
 
-	-- Always update snapshot
-	moneySnapshot = currentMoney
+	self.moneySnapshot = currentMoney
+end
+
+-- Bridge method on main addon
+function LibsFarmAssistant:SnapshotMoney()
+	if self.MoneyTracker then
+		self.MoneyTracker:SnapshotMoney()
+	end
 end

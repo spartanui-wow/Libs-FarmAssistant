@@ -1,43 +1,25 @@
----@class LibsFarmAssistant : AceAddon
+---@class LibsFarmAssistant : AceAddon, AceEvent-3.0, AceTimer-3.0, AceConsole-3.0
 local ADDON_NAME, LibsFarmAssistant = ...
 
 LibsFarmAssistant = LibStub('AceAddon-3.0'):NewAddon(ADDON_NAME, 'AceEvent-3.0', 'AceTimer-3.0', 'AceConsole-3.0')
 _G.LibsFarmAssistant = LibsFarmAssistant
 
+LibsFarmAssistant:SetDefaultModuleLibraries('AceEvent-3.0', 'AceTimer-3.0')
+
 LibsFarmAssistant.version = '1.0.0'
 LibsFarmAssistant.addonName = "Lib's Farm Assistant"
 
 function LibsFarmAssistant:OnInitialize()
-	-- Initialize logger
 	if LibAT and LibAT.Logger then
 		self.logger = LibAT.Logger.RegisterAddon('LibsFarmAssistant')
 	end
 
-	-- Database is initialized in Core/Database.lua
-	self:InitializeDatabase()
-
-	-- Register slash commands
 	self:RegisterChatCommand('libsfa', 'SlashCommand')
 	self:RegisterChatCommand('farmassist', 'SlashCommand')
 end
 
 function LibsFarmAssistant:OnEnable()
-	-- Initialize subsystems
-	self:InitializeSession()
-	self:InitializeLootTracker()
-	self:InitializeLootingSystem()
-	self:InitializeMoneyTracker()
-	self:InitializeCurrencyTracker()
-	self:InitializeReputationTracker()
-	self:InitializeHonorTracker()
-	self:InitializeSessionHistory()
-	self:InitializeNotifications()
-	self:InitializeGoalTracker()
-	self:InitializeDataBroker()
-	self:InitializeMinimapButton()
-	self:InitializeItemDragDrop()
-	self:InitializeSmartSession()
-	self:InitializeOptions()
+	-- Modules auto-enable via Ace3 lifecycle
 
 	-- Register with Addon Compartment (10.x+ dropdown)
 	if AddonCompartmentFrame and AddonCompartmentFrame.RegisterAddon then
@@ -94,10 +76,28 @@ function LibsFarmAssistant:SlashCommand(input)
 	end
 end
 
--- Logging helper
 function LibsFarmAssistant:Log(message, level)
 	level = level or 'info'
 	if self.logger and self.logger[level] then
 		self.logger[level](message)
+	end
+end
+
+-- Bridge methods for modules
+function LibsFarmAssistant:UpdateDisplay()
+	if self.DataBroker then
+		self.DataBroker:UpdateDisplay()
+	end
+end
+
+function LibsFarmAssistant:OpenOptions()
+	if self.Options then
+		self.Options:OpenOptions()
+	end
+end
+
+function LibsFarmAssistant:TogglePopup()
+	if self.PopupWindow then
+		self.PopupWindow:TogglePopup()
 	end
 end

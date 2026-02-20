@@ -1,16 +1,14 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-----------------------------------------------------------------------------------------------------
--- Smart Session Auto-Detection
--- Automatically starts/prompts a farming session when loot activity is detected
--- Auto-pauses on AFK
-----------------------------------------------------------------------------------------------------
+---@class LibsFarmAssistant.SmartSession : AceModule, AceEvent-3.0, AceTimer-3.0
+local SmartSession = LibsFarmAssistant:NewModule('SmartSession')
+LibsFarmAssistant.SmartSession = SmartSession
 
-local recentLootTimes = {} -- timestamps of recent loot events
+function SmartSession:OnEnable()
+	self.recentLootTimes = {}
 
-function LibsFarmAssistant:InitializeSmartSession()
-	local settings = self.db.smartSession
+	local settings = LibsFarmAssistant.db.smartSession
 	if not settings or not settings.enabled then
 		return
 	end
@@ -35,59 +33,60 @@ function LibsFarmAssistant:InitializeSmartSession()
 		hideOnEscape = true,
 	}
 
-	self:Log('Smart session initialized', 'debug')
+	LibsFarmAssistant:Log('Smart session initialized', 'debug')
+end
+
+function SmartSession:OnDisable()
+	self:UnregisterAllEvents()
 end
 
 ---Check loot events for smart session triggering
-function LibsFarmAssistant:SmartSessionLootCheck()
-	local settings = self.db.smartSession
+function SmartSession:SmartSessionLootCheck()
+	local settings = LibsFarmAssistant.db.smartSession
 	if not settings or not settings.enabled then
 		return
 	end
 
 	-- Only trigger when session is paused/inactive
-	if self:IsSessionActive() then
+	if LibsFarmAssistant:IsSessionActive() then
 		return
 	end
 
 	local now = GetTime()
-	table.insert(recentLootTimes, now)
+	table.insert(self.recentLootTimes, now)
 
 	-- Prune events outside the time window
 	local windowStart = now - (settings.timeWindowSeconds or 30)
 	local pruned = {}
-	for _, t in ipairs(recentLootTimes) do
+	for _, t in ipairs(self.recentLootTimes) do
 		if t >= windowStart then
 			table.insert(pruned, t)
 		end
 	end
-	recentLootTimes = pruned
+	self.recentLootTimes = pruned
 
 	-- Check if threshold met
-	if #recentLootTimes >= (settings.lootThreshold or 3) then
-		recentLootTimes = {} -- Reset to avoid re-triggering
+	if #self.recentLootTimes >= (settings.lootThreshold or 3) then
+		self.recentLootTimes = {}
 
 		if settings.autoStart then
-			-- Auto-start immediately
-			self:ResetSession()
-			self:Print('Smart session auto-started (detected farming activity)')
+			LibsFarmAssistant:ResetSession()
+			LibsFarmAssistant:Print('Smart session auto-started (detected farming activity)')
 		else
-			-- Show prompt
 			StaticPopup_Show('LIBSFA_SMART_SESSION_START')
 		end
 	end
 end
 
 ---Check for AFK status changes to auto-pause
-function LibsFarmAssistant:SmartSessionAFKCheck()
-	local settings = self.db.smartSession
+function SmartSession:SmartSessionAFKCheck()
+	local settings = LibsFarmAssistant.db.smartSession
 	if not settings or not settings.enabled then
 		return
 	end
 
-	-- Auto-pause if player goes AFK during an active session
-	if UnitIsAFK('player') and self:IsSessionActive() then
-		self:ToggleSession() -- Pauses the session
-		self:Print('Session auto-paused (AFK detected)')
+	if UnitIsAFK('player') and LibsFarmAssistant:IsSessionActive() then
+		LibsFarmAssistant:ToggleSession()
+		LibsFarmAssistant:Print('Session auto-paused (AFK detected)')
 	end
 end

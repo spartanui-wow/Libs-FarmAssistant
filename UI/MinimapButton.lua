@@ -1,19 +1,23 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
-function LibsFarmAssistant:InitializeMinimapButton()
+---@class LibsFarmAssistant.MinimapButton : AceModule, AceEvent-3.0, AceTimer-3.0
+local MinimapButton = LibsFarmAssistant:NewModule('MinimapButton')
+LibsFarmAssistant.MinimapButton = MinimapButton
+
+function MinimapButton:OnEnable()
 	local LibDBIcon = LibStub('LibDBIcon-1.0', true)
-	if not LibDBIcon or not self.dataObject then
+	if not LibDBIcon or not LibsFarmAssistant.dataObject then
 		return
 	end
 
 	-- Smart default: hide minimap icon when Libs-DataBar is present (it shows LDB data already)
-	if not self.db.minimapDefaultApplied then
-		self.db.minimapDefaultApplied = true
+	if not LibsFarmAssistant.db.minimapDefaultApplied then
+		LibsFarmAssistant.db.minimapDefaultApplied = true
 		if C_AddOns.IsAddOnLoaded('Libs-DataBar') then
-			self.db.minimap.hide = true
+			LibsFarmAssistant.db.minimap.hide = true
 		end
 	end
 
-	LibDBIcon:Register("Lib's FarmAssistant", self.dataObject, self.db.minimap)
+	LibDBIcon:Register("Lib's FarmAssistant", LibsFarmAssistant.dataObject, LibsFarmAssistant.db.minimap)
 end
