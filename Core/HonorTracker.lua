@@ -1,5 +1,6 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
+local canaccessvalue = canaccessvalue or function() return true end
 
 ---@class LibsFarmAssistant.HonorTracker : AceModule, AceEvent-3.0, AceTimer-3.0
 local HonorTracker = LibsFarmAssistant:NewModule('HonorTracker')
