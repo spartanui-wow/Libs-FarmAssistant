@@ -62,3 +62,4 @@ UI\Options.lua
 UI\MinimapButton.lua
 UI\ItemDragDrop.lua
 UI\PopupWindow.lua
+UI\SetupWizard.lua

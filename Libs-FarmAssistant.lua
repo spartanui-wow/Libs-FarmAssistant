@@ -46,6 +46,9 @@ function LibsFarmAssistant:OnEnable()
 		})
 	end
 
+	-- Register setup wizard page
+	self:RegisterSetupWizard()
+
 	-- Update display every 60 seconds for rate calculations
 	self:ScheduleRepeatingTimer('UpdateDisplay', 60)
 
