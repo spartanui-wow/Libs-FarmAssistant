@@ -1,245 +1,127 @@
 # CLAUDE.md - Lib's Farm Assistant
 
-This file provides guidance to Claude Code when working with the Libs-FarmAssistant addon.
+Guidance for working on Libs-FarmAssistant. Root rules in `C:\code\CLAUDE.md` and `.context/` apply.
+Product truth (who it is for, principles) lives in `PRODUCT.md`.
 
-## Project Overview
+## What it is
 
-**Lib's Farm Assistant** is a session-based farming assistant for World of Warcraft. It provides **active auto-looting** with a priority-based filter system (quality, price, whitelist/blacklist, quest items, fishing, BoP, alerts) plus **comprehensive tracking** of loot, money, currency, reputation, and honor gains with per-hour rate calculations, session history with personal bests, trend comparison arrows, goal/target tracking with progress bars, vendor value estimation, and session time notifications. Session data persists through `/rl` (ReloadUI) via character-scoped SavedVariables. Registers as a LibDataBroker data source.
+Tracks everything a player farms and ties it to where it came from: loot and its value, gold by
+source, kills, drops per mob/node/fishing spot, rare drop hunts (attempts, luck), reputation,
+currency, experience and honor. Every gain is kept for the session, today, the week (since the
+weekly reset), the month and all time. It also has a priority-based auto-looter.
+
+Runs on every client: Retail 12.x, WoW Forever, Mists, Titan, TBC Anniversary, Classic Era.
+The window, tracker and tooltips need no other addon (Libs-DataBar and Libs-AddonTools are optional).
 
 ## Architecture
 
 ```
-Libs-FarmAssistant/
-├── Libs-FarmAssistant.toc       # Interface 120005, SavedVariables: LibsFarmAssistantDB
-├── Libs-FarmAssistant.lua       # AceAddon main + LibAT Logger
-├── Core/
-│   ├── Database.lua             # AceDB with char (session+history) + profile (settings+goals+autoLoot)
-│   ├── SessionManager.lua       # Session lifecycle, FormatNumber/Money/Duration, GetTotalVendorValue
-│   ├── LootTracker.lua          # CHAT_MSG_LOOT — passive item tracking with dedup for auto-looted items
-│   ├── MoneyTracker.lua         # PLAYER_MONEY — GetMoney() delta tracking
-│   ├── CurrencyTracker.lua      # CHAT_MSG_CURRENCY — currency link extraction
-│   ├── ReputationTracker.lua    # CHAT_MSG_COMBAT_FACTION_CHANGE — faction/amount parsing
-│   ├── HonorTracker.lua         # CHAT_MSG_COMBAT_HONOR_GAIN — PvP honor tracking
-│   ├── SessionHistory.lua       # Save sessions to history, personal bests, averages
-│   ├── Notifications.lua        # Periodic session reminder chat messages
-│   ├── GoalTracker.lua          # Goal progress, completion, ETA, progress bars
-│   └── Looting/                 # Active auto-looting system
-│       ├── LootingModule.lua    # Base module prototype, registration, sorted cache
-│       ├── LootingCore.lua      # LOOT_READY/LOOT_OPENED handler, module iteration, LootSlot()
-│       └── Modules/             # 14 priority-based filter modules
-│           ├── AlertList.lua    # Priority 1    — Sound + raid warning for special items
-│           ├── Locked.lua       # Priority 100  — Skip locked items
-│           ├── WatchedItems.lua # Priority 150  — Priority-loot watched items
-│           ├── Money.lua        # Priority 200  — Auto-loot gold/silver/copper
-│           ├── Currency.lua     # Priority 300  — Auto-loot currencies
-│           ├── WhiteList.lua    # Priority 400  — Always loot whitelisted items
-│           ├── BlackList.lua    # Priority 500  — Never loot blacklisted items
-│           ├── IgnoreBOP.lua    # Priority 600  — Skip Bind on Pickup items
-│           ├── Rarity.lua       # Priority 700  — Quality-based filtering (per-tier)
-│           ├── Quest.lua        # Priority 800  — Auto-loot quest items
-│           ├── Token.lua        # Priority 900  — Loot items with no vendor price
-│           ├── Price.lua        # Priority 1000 — Minimum vendor price threshold
-│           ├── Fishing.lua      # Priority 1200 — Loot everything while fishing
-│           └── All.lua          # Priority 99999 — Fallback: loot everything
-├── UI/
-│   ├── DataBroker.lua           # LDB data source, display format, notification/goal checks
-│   ├── Tooltip.lua              # Full tooltip: items, money, currency, rep, honor, goals, trends
-│   ├── Options.lua              # AceConfig: tracking, auto-looting, notifications, display, goals
-│   ├── MinimapButton.lua        # LibDBIcon registration
-│   ├── ItemDragDrop.lua         # Drag items to minimap: default=watch, Shift=whitelist, Ctrl=blacklist, Alt=alert
-│   └── PopupWindow.lua          # Standalone dashboard window
-├── libs/
-│   ├── Ace3/                    # Full Ace3 framework
-│   ├── LibDataBroker-1.1/       # LDB protocol
-│   └── LibDBIcon-1.0/           # Minimap button
-├── Logo-Icon.tga                # Addon icon
-└── .github/                     # CI workflows
+Libs-FarmAssistant.lua        AceAddon, slash /farm, throttled UpdateDisplay -> LIBSFA_UPDATE message
+Core/
+  Compat.lua                  Every client-specific API + secret-value guards (CanAccess, Readable),
+                              FactionProgress (standard/friendship/renown/paragon in one shape),
+                              Collectible (mount/pet/toy), FormatToPattern (GlobalStrings -> patterns),
+                              RegisterEvent (skips events the client does not know)
+  Format.lua                  Number, money, duration, clock, odds ("1 in 14"), percent, dates
+  Ledger.lua                  The data model. Buckets, writes, window sums, rates, item sources, archive
+  Database.lua                AceDB defaults and migration from the v1 layout (DATA_VERSION)
+  Pricing.lua                 Item meta cache (name/quality/sell price/bind) + vendor/auction value
+  SessionManager.lua          Session clock (active seconds, never timestamps), pause, AFK, new session
+  Sources.lua                 GUID -> source key, names, kill counting once per GUID
+  LootTracker.lua             Loot window snapshot + LOOT_SLOT_CLEARED + CHAT_MSG_LOOT dedupe
+  MoneyTracker.lua            GetMoney() deltas, categorized by which window is open
+  CurrencyTracker.lua         CURRENCY_DISPLAY_UPDATE; honor (currency on Mists+, chat on older)
+  ReputationTracker.lua       Monotonic faction totals diffed; chat as a hint; Gains(bucket) for UI
+  ExperienceTracker.lua       UnitXP deltas across level-ups; time/kills to level
+  Hunts.lua                   Attempt counting, drop history, sources, luck math
+  GoalTracker.lua             Session goals with ETA
+  Notifications.lua, SmartSession.lua
+  Looting/                    Auto-loot: priority modules; only decides what to take
+UI/
+  Theme.lua                   Tokens (colors, sizes, fonts) and primitives (Fill, Border, Rule, Text, Icon)
+  Widgets.lua                 Button, IconButton (bar glyphs), Segmented, Chip, EditBox, Heading, Bar,
+                              List (virtual rows), Table (columns, sort, select), tooltip helpers
+  Components.lua              RepCard, HuntCard, StandingColor, RepPace, ItemRows
+  Window.lua                  Main window shell: header clock + time range switch, nav, footer, pages
+  Pages/                      Overview, Loot, Hunts, Sources, Progress, History (FarmPage interface)
+  Tracker.lua                 Compact always-on panel
+  DataBroker.lua, Tooltip.lua LDB object and its tooltip
+  GameTooltips.lua            Optional lines on item and creature tooltips
+  Options.lua                 AceConfig tabs: General, Tracking, Hunts and Goals, Display, Auto-Loot, Watched
+Tests/                        Headless harness (not packaged)
 ```
 
-## Key Design Decisions
+## Data model
 
-### Session Persistence (char-scoped SavedVariables)
-- Session data stored in `dbobj.char.session` — per-character, survives `/rl`
-- Includes: `items`, `money`, `currencies`, `reputation`, `honor`, `startTime`, `pausedDuration`, `active`
-- Session history stored in `dbobj.char.history` — array of up to 20 snapshots
-- Personal best rates stored in `dbobj.char.bestRates`
-- Profile settings (tracking toggles, quality filter, display format, goals, notifications) are separate
+Every bucket (session, `char.days[YYYY-MM-DD]`, `char.months[YYYY-MM]`, `char.lifetime`) has:
 
-### Auto-Looting System (Active Looting)
-- Priority-based module system: 14 modules checked in priority order (lowest number first)
-- Hooks `LOOT_READY` (fast) or `LOOT_OPENED` (configurable) to call `LootSlot()` automatically
-- Each module's `CanLoot(slotData)` returns `{ loot, reason, forceBreak }` or nil
-- First module returning `loot=true` wins → item is looted and recorded
-- First module returning `forceBreak=true` stops processing (blacklist, locked)
-- AlertList fires alerts but doesn't affect loot decision (no loot/forceBreak)
-- Auto-looted items are dedup'd against passive CHAT_MSG_LOOT tracker (2-second window)
-- Settings stored in `profile.autoLoot` (general) and `profile.lootModules` (per-module)
-- Three separate item lists: Watched (char-scoped), Whitelist/Blacklist/AlertList (profile-scoped)
-- Drag-and-drop to minimap: default=watched, Shift=whitelist, Ctrl=blacklist, Alt=alert
-
-### Loot Tracking (Language-Independent, Passive Fallback)
-- Extracts item links directly from CHAT_MSG_LOOT text via pattern: `|c%x+|Hitem:[%d:]+|h%[.-%]|h|r`
-- Extracts quantity via `x(%d+)` pattern (defaults to 1)
-- Gets item info (name, quality, icon) from `C_Item.GetItemInfo(itemLink)`
-- Quality filter: configurable minimum quality (0=Poor through 4=Epic)
-- Falls back gracefully if item info isn't cached yet
-
-### Money Tracking (Delta-Based)
-- Uses `GetMoney()` snapshots instead of parsing CHAT_MSG_MONEY (language-independent)
-- Only tracks gains (positive deltas), ignores spending
-- Snapshot updated on every PLAYER_MONEY event
-- Snapshot reset on session reset and during paused state
-
-### Session Pause/Resume
-- `ToggleSession()` pauses/resumes tracking
-- Paused time is tracked via `pausedDuration` accumulator
-- `GetSessionDuration()` subtracts paused time from total elapsed
-- All event handlers check `IsSessionActive()` before recording
-
-### Rate Calculations
-- All rates use `GetSessionHours()` (active session time in hours)
-- Tooltip shows per-hour rates for every tracked item/currency/faction
-- Display updates every 60 seconds via AceTimer
-
-## Data Structures
-
-### Session Items
 ```lua
-session.items[itemID_string] = {
-    name = 'Linen Cloth',
-    link = '|cffffffff|Hitem:2589:...|h[Linen Cloth]|h|r',
-    icon = texturePath,
-    quality = 1,
-    count = 42,
-    sellPrice = 25,  -- per-unit vendor sell price in copper
-}
+{ time, kills, loots, xp, honor, spent,
+  money = { loot, vendor, quest, mail, other },   -- copper by where it came from
+  items = { [itemID] = quantity },
+  currencies = { [currencyID] = amount },
+  rep = { [factionID] = amount },
+  sources = { [sourceKey] = { kills, loots, money, items = { [itemID] = qty }, drops = { [itemID] = loots containing it } } } }
 ```
 
-### Session Currencies
-```lua
-session.currencies['Dragon Isles Supplies'] = {
-    name = 'Dragon Isles Supplies',
-    icon = fileID,
-    count = 15,
-}
-```
+- Source keys: `c:<npcID>` creature, `o:<objectID>` node/chest, `f:<zone>` fishing, `i` containers,
+  `e:<encounterID>` boss encounter, `q` rewards and other.
+- "1 in N" uses `drops` (loot events), never quantity. Tries = kills for creatures, opens otherwise.
+- Weeks are summed from days (`Ledger:Window('week')`, cached by `Ledger.version`). Days older than
+  62 days are pruned; months and lifetime keep totals.
+- `global.itemMeta` / `global.sourceMeta` are account-wide name caches.
+- `char.sessions` holds short summaries (last 100). `char.hunts[itemID string]` holds hunts.
 
-### Session Reputation
-```lua
-session.reputation['Valdrakken Accord'] = 250  -- total rep gained
-```
+## Rules that keep counts honest
 
-### Session Honor
-```lua
-session.honor = 1500  -- total honor gained
-```
+- A creature counts once per GUID, whichever signal arrives first: `PARTY_KILL` (exists on every
+  client, payload can be secret on Retail), `PLAYER_TARGET_DIED` (Retail fallback), or looting the corpse.
+  Skinning or re-opening a corpse never adds a kill or a loot.
+- Items count only when the slot leaves the loot window (`LOOT_SLOT_CLEARED`). The same items then
+  arriving in chat are consumed from an expectation table. Chat-only loot (personal loot, bonus
+  rolls) is credited to the last kill within 20 seconds.
+- Group-loot items at or above the roll threshold are left to the chat path (only the winner gets them).
+- The auto-looter calls `LootTracker:Snapshot()` before `LootSlot()`; it never records items itself.
+- Money: an open loot/merchant/mail/quest window outranks one that closed a moment ago.
+- Everything checks `IsSessionActive()`; pausing stops the clock and the counting.
 
-### Session History Snapshot
-```lua
-char.history[1] = {
-    timestamp = 1700000000,  -- time() epoch
-    duration = 3600,         -- seconds of active farming
-    totalItems = 234,
-    items = { ['2589'] = { name='Linen Cloth', count=100, quality=1, sellPrice=25 } },
-    money = 50000,           -- copper
-    currencies = { ['Dragon Isles Supplies'] = 15 },
-    reputation = { ['Valdrakken Accord'] = 250 },
-    honor = 500,
-    totalVendorValue = 2500, -- copper
-    itemsPerHour = 234,      -- pre-computed rates
-    goldPerHour = 50000,
-    honorPerHour = 500,
-}
-```
+## Messages
 
-### Goals
-```lua
-profile.goals[1] = {
-    type = 'item',       -- 'item', 'money', 'honor', 'currency', 'reputation'
-    targetValue = 1000,  -- target count (copper for money goals)
-    targetItemID = 2589, -- for item goals
-    targetName = 'Linen Cloth',
-    active = true,
-}
-```
+`LIBSFA_UPDATE` (throttled redraw), `LIBSFA_SESSION_STARTED`, `LIBSFA_SESSION_STATE`,
+`LIBSFA_TIME_ADDED(seconds)`, `LIBSFA_ATTEMPT(sourceKey)`, `LIBSFA_ITEM_GAINED(itemID, qty, sourceKey, link)`,
+`LIBSFA_REP_GAINED`, `LIBSFA_CURRENCY_GAINED`, `LIBSFA_HUNTS_CHANGED`, `LIBSFA_HUNTS_UPDATED`,
+`LIBSFA_ITEM_LOADED`, `LIBSFA_SETTINGS_CHANGED`.
 
-## Display Formats
+## UI rules
 
-Configurable in options: `items` | `money` | `combined`
-
-## Click Behaviors
-
-| Button | Action |
-|--------|--------|
-| Left Click | Open Dashboard |
-| Right Click | Pause/Resume session |
-| Shift+Click (either) | Reset session (with confirmation) |
-| Scroll Wheel | Cycle display format (items/money/combined) |
-
-## Slash Commands
-
-- `/farmassist` or `/libsfa` — Open options
-- `/farmassist reset` — Reset session
-- `/farmassist pause` — Toggle pause
-- `/farmassist summary` — Print session summary to chat
-
-## Reference Addons
-
-- `C:\Users\jerem\OneDrive\WoW\Examples\DataBar\FarmCount` — Chat-based farming tracker (inspiration for event handling)
-- `C:\Users\jerem\OneDrive\WoW\Examples\AutoLooter` — Selective auto-looting addon (inspiration for priority-based module system)
+- Visual world: the Lib's family (see `UI/Theme.lua`): flat near-black panes, 1px lines, color only
+  for game meaning (item quality, standing, gold, good/bad). Friz for words, Arial Narrow for figures.
+- No Unicode glyphs: icons are textures; header glyphs are drawn from bars (`W.IconButton`).
+- Pages implement `Create(parent, window)`, `Refresh(bucket, range)`, optional `Count(bucket)`.
+- Design direction and the layout mock live in `.impeccable/` (git-ignored, local only).
 
 ## Testing
 
-### Core Tracking
-1. Kill mobs → verify items appear in tooltip with counts and rates
-2. Loot gold → verify money tracking (compare with bags)
-3. Earn currency → verify currency section appears
-4. Gain reputation → verify rep section appears
-5. Enter BG, earn honor → verify honor section appears with /hr rate
-6. Test quality filter: Set to Uncommon, verify gray/white items ignored
-7. Test pause/resume: Pause, loot items, verify not tracked
-8. Test `/rl`: Reload UI, verify session data persists
-9. Test reset: Verify all data cleared, timer restarted
+Headless (no game needed):
 
-### Number Formatting
-10. Loot 1000+ items → verify tooltip shows "1,234" not "1234"
-11. Earn 10000+ gold → verify gold shows "1,234g" not "1234g"
+```
+"C:/Users/jerem/.vscode/extensions/sumneko.lua-3.19.1-win32-x64/server/bin/lua-language-server.exe" Tests/run.lua
+```
 
-### Vendor Value
-12. Loot items → verify "Est. Vendor Value" line under items list
-13. Test /rl → verify sellPrice backfill works (ITEM_DATA_LOAD_RESULT)
+`Tests/run.lua core` skips the UI. The harness loads real Ace3 + LibDataBroker + AceConfigRegistry
+(which validates the options table) against a mocked client. Scenarios cover kills, skinning,
+group kills, area loot splits, chat dedupe, filters, money categories, hunts, reputation, XP
+level-ups, currency/honor, fishing, pause/AFK, goals, sessions, weeks, and a UI smoke pass.
 
-### Session History
-14. Farm >1 min, reset → verify "Session saved" log message
-15. Farm again → check tooltip for "Personal Best" green indicator
-16. Reset 3+ times → verify trend arrows (▲/▼) appear next to rates
-
-### Notifications
-17. Enable at 5-min frequency → verify chat reminder appears
-
-### Goals
-18. Add item goal (e.g., Item 2589, target 50) → farm, verify progress bar
-19. Verify ETA updates as you loot
-20. Verify sound + chat on completion
-21. Test money/honor goals
-22. Verify goals persist after /rl
-23. Verify completed goals show checkmark, don't re-notify after /rl
-
-### Auto-Looting
-24. Enable auto-looting, kill mob → items looted automatically
-25. Disable auto-looting → falls back to manual loot + passive tracking
-26. Toggle fast loot → verify LOOT_READY vs LOOT_OPENED behavior
-27. Enable close loot → verify window closes after looting
-28. Enable only Uncommon+ quality → kill mob, verify grey/white items left on corpse
-29. Add item to whitelist → verify always looted regardless of quality
-30. Add item to blacklist → verify never looted
-31. Accept quest, kill mob → verify quest items auto-looted
-32. Enable Ignore BoP → verify BoP items left on corpse
-33. Go fishing with fishing mode ON → verify all catches looted
-34. Set minimum price to 1g → verify cheap items ignored
-35. Add item to alert list → when it drops, verify sound + raid warning
-36. Shift+drag item to minimap → verify added to whitelist
-37. Ctrl+drag item to minimap → verify added to blacklist
-38. Alt+drag item to minimap → verify added to alert list
-39. Auto-loot + goal tracking → verify goal progress updates
-40. Manual loot while auto-loot enabled → verify no double-counting
+In game, check:
+1. Kill and loot mobs: Overview income/kills/top loot, Sources shows the mob with drops and rates.
+2. Skin a looted corpse: kills do not go up.
+3. Group loot on an epic: counted only for the winner.
+4. Sell to a vendor: "Sold to vendors" rises, looted gold does not.
+5. Gain rep (normal, renown, paragon, friendship): Progress bars, pace, and no double counts.
+6. Level up mid-session: XP keeps counting across the level.
+7. Add a hunt (Shift-click into the Hunts box), kill mobs, set a drop chance: luck bar and text.
+8. Log out for over 30 minutes: a new session starts, the old one is in History.
+9. /reload: everything persists; the window reopens on the same page and range.
+10. Item and creature tooltips show farming lines only when there is data.
+11. Classic Era and Mists: no errors, rep and honor still counted.

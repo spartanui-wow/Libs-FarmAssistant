@@ -6,6 +6,9 @@ manual-changelog:
 
 ignore:
     README.md
+    CLAUDE.md
+    PRODUCT.md
+    Tests
     *.Definition.lua
 
 enable-nolib-creation: no
