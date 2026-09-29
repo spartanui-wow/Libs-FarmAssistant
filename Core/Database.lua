@@ -127,6 +127,9 @@ local defaults = {
 }
 
 function Database:OnInitialize()
+	-- Before AceDB fills in defaults, so a removed value gets its default back
+	self:RepairSetupValues(_G.LibsFarmAssistantDB)
+
 	local dbobj = LibStub('AceDB-3.0'):New('LibsFarmAssistantDB', defaults, true)
 	LibsFarmAssistant.dbobj = dbobj
 	LibsFarmAssistant.db = dbobj.profile
@@ -173,6 +176,57 @@ function Database:Migrate()
 	end
 
 	char.dataVersion = DATA_VERSION
+end
+
+-- An early first-run page saved an empty table instead of true or false. Settings it may have
+-- touched go back to their default when they hold a table; keys nothing reads any more are dropped.
+local SETUP_SETTINGS = {
+	{ path = { 'tracking', 'mode' } },
+	{ path = { 'tracking', 'qualities', 0 } },
+	{ path = { 'tooltips', 'items' } },
+	{ path = { 'tooltips', 'units' } },
+	{ path = { 'tracker', 'shown' } },
+	{ path = { 'trackMoney' }, unused = true },
+	{ path = { 'trackCurrency' }, unused = true },
+}
+
+---Fix settings the old first-run page stored as tables, in every saved profile. Runs once per account.
+---@param sv table|nil The saved variable, before AceDB has loaded it
+function Database:RepairSetupValues(sv)
+	if type(sv) ~= 'table' then
+		return
+	end
+	if type(sv.global) ~= 'table' then
+		sv.global = {}
+	end
+	if sv.global.setupValuesRepaired then
+		return
+	end
+	local repaired = 0
+	local profiles = type(sv.profiles) == 'table' and sv.profiles or {}
+	for _, profile in pairs(profiles) do
+		if type(profile) == 'table' then
+			for _, setting in ipairs(SETUP_SETTINGS) do
+				local parent = profile
+				local path = setting.path
+				for i = 1, #path - 1 do
+					parent = type(parent) == 'table' and rawget(parent, path[i]) or nil
+				end
+				local key = path[#path]
+				if type(parent) == 'table' then
+					local value = rawget(parent, key)
+					if value ~= nil and (setting.unused or type(value) == 'table') then
+						parent[key] = nil
+						repaired = repaired + 1
+					end
+				end
+			end
+		end
+	end
+	sv.global.setupValuesRepaired = true
+	if repaired > 0 then
+		LibsFarmAssistant:Log('Repaired ' .. repaired .. ' saved setting(s) from the old setup page', 'info')
+	end
 end
 
 function LibsFarmAssistant:OnProfileChanged()

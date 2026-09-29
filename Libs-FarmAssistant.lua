@@ -18,6 +18,12 @@ function LibsFarmAssistant:OnInitialize()
 		self.logger = LibAT.Logger.RegisterAddon('LibsFarmAssistant')
 	end
 
+	-- Before the Database module creates the saved settings, so the setup window can tell a new
+	-- install from an existing one
+	if self.RegisterSetup then
+		self:RegisterSetup()
+	end
+
 	self:RegisterChatCommand('farm', 'SlashCommand')
 	self:RegisterChatCommand('libsfa', 'SlashCommand')
 	self:RegisterChatCommand('farmassist', 'SlashCommand')
@@ -45,10 +51,6 @@ function LibsFarmAssistant:OnEnable()
 				GameTooltip:Hide()
 			end,
 		})
-	end
-
-	if self.RegisterSetupWizard then
-		self:RegisterSetupWizard()
 	end
 
 	self:Log("Lib's Farm Assistant loaded", 'info')
