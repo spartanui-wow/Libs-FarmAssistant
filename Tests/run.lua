@@ -499,7 +499,7 @@ if not coreOnly then
 		loot.selected = 21383
 		A.Window:ShowPage('loot')
 		H.ok(loot.detailName.text == 'Winterfall Spirit Beads', 'loot detail shows the item')
-		H.ok(loot.note.text and loot.note.text:find('as often') , 'loot detail compares sources: ' .. tostring(loot.note.text))
+		H.ok(loot.note.text and loot.note.text:find('as often'), 'loot detail compares sources: ' .. tostring(loot.note.text))
 		local hunts = A.Pages.hunts
 		hunts.selected = 16254
 		A.Window:ShowPage('hunts')

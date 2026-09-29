@@ -26,7 +26,16 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 	local bucket = Ledger:Session()
 	local active = self:IsSessionActive()
 
-	tooltip:AddDoubleLine('Farm Assistant', (active and '' or 'Paused  ') .. Format.Clock(self:GetSessionDuration()), 1, 1, 1, active and C.text[1] or C.warn[1], active and C.text[2] or C.warn[2], active and C.text[3] or C.warn[3])
+	tooltip:AddDoubleLine(
+		'Farm Assistant',
+		(active and '' or 'Paused  ') .. Format.Clock(self:GetSessionDuration()),
+		1,
+		1,
+		1,
+		active and C.text[1] or C.warn[1],
+		active and C.text[2] or C.warn[2],
+		active and C.text[3] or C.warn[3]
+	)
 
 	local value = Ledger.TotalValue(bucket)
 	local rate = Ledger.PerHour(value, bucket)

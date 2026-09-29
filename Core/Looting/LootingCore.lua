@@ -199,4 +199,3 @@ function LibsFarmAssistant:ProcessSlot(slotData, modules)
 	end
 	return nil, nil
 end
-

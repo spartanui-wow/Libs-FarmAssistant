@@ -165,7 +165,11 @@ function Page:CreateDetail(parent)
 			return Format.Odds(row.rate), row.best and C.good or C.text
 		end,
 		onEnter = function(rowFrame, row)
-			W.ShowTooltip(rowFrame, Ledger.SourceName(row.key), string.format('%s tries, dropped %s times (%s in total).', Format.Number(row.kills), Format.Number(row.drops), Format.Number(row.quantity)))
+			W.ShowTooltip(
+				rowFrame,
+				Ledger.SourceName(row.key),
+				string.format('%s tries, dropped %s times (%s in total).', Format.Number(row.kills), Format.Number(row.drops), Format.Number(row.quantity))
+			)
 		end,
 	})
 	sources:SetPoint('TOPLEFT', heading, 'BOTTOMLEFT', 0, -2)
