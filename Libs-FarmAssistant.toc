@@ -1,6 +1,6 @@
-## Interface: 120100, 120007, 50504, 38002, 20506, 11508
+## Interface: 120100, 120007, 16001, 50504, 38002, 20506, 11509
 ## Title: Lib's - Farm Assistant
-## Notes: Session-based farming tracker with loot, money, currency, reputation, and honor tracking with goals and history
+## Notes: Tracks everything you farm - loot, gold, drops per mob, rare drop hunts, reputation, currency, experience and honor - by session, day, week and month
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
 ## Version: @project-version@
 ## Author: Wutname1
@@ -25,16 +25,21 @@ libs\LibDBIcon-1.0\lib.xml
 
 # Core
 Libs-FarmAssistant.lua
+Core\Compat.lua
+Core\Format.lua
+Core\Ledger.lua
 Core\Database.lua
+Core\Pricing.lua
 Core\SessionManager.lua
+Core\Sources.lua
 Core\LootTracker.lua
 Core\MoneyTracker.lua
 Core\CurrencyTracker.lua
 Core\ReputationTracker.lua
-Core\HonorTracker.lua
-Core\SessionHistory.lua
-Core\Notifications.lua
+Core\ExperienceTracker.lua
+Core\Hunts.lua
 Core\GoalTracker.lua
+Core\Notifications.lua
 Core\SmartSession.lua
 
 # Auto-Looting System
@@ -56,10 +61,21 @@ Core\Looting\Modules\Fishing.lua
 Core\Looting\Modules\All.lua
 
 # UI
+UI\Theme.lua
+UI\Widgets.lua
+UI\Components.lua
+UI\Window.lua
+UI\Pages\Overview.lua
+UI\Pages\Loot.lua
+UI\Pages\Hunts.lua
+UI\Pages\Sources.lua
+UI\Pages\Progress.lua
+UI\Pages\History.lua
+UI\Tracker.lua
 UI\DataBroker.lua
 UI\Tooltip.lua
+UI\GameTooltips.lua
 UI\Options.lua
 UI\MinimapButton.lua
 UI\ItemDragDrop.lua
-UI\PopupWindow.lua
 UI\SetupWizard.lua

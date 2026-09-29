@@ -46,11 +46,11 @@ function ItemDragDrop:HandleItemDrop()
 		targetList = 'alertList'
 	end
 
-	local itemName, itemLink, itemQuality, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(itemID)
+	local itemName, itemLink, itemQuality, _, _, itemIcon = LibsFarmAssistant.Compat.ItemInfo(itemID)
 	if not itemName then
 		local listTarget = targetList
 		C_Timer.After(0.5, function()
-			local name, link, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
+			local name, link, quality, _, _, icon = LibsFarmAssistant.Compat.ItemInfo(itemID)
 			if name then
 				LibsFarmAssistant:AddItemToList(listTarget, itemID, name, link, quality, icon)
 			else
@@ -105,18 +105,14 @@ end
 ---@param quality number
 ---@param icon number|string
 function ItemDragDrop:AddWatchedItem(itemID, name, link, quality, icon)
-	if not LibsFarmAssistant.session.watchedItems then
-		LibsFarmAssistant.session.watchedItems = {}
-	end
-
 	local key = tostring(itemID)
 
-	if LibsFarmAssistant.session.watchedItems[key] then
+	if LibsFarmAssistant.char.watchedItems[key] then
 		LibsFarmAssistant:Print('Already watching: ' .. (link or name))
 		return
 	end
 
-	LibsFarmAssistant.session.watchedItems[key] = {
+	LibsFarmAssistant.char.watchedItems[key] = {
 		itemID = itemID,
 		name = name,
 		link = link,
@@ -131,15 +127,11 @@ end
 ---Remove an item from the watch list
 ---@param itemID number|string
 function ItemDragDrop:UnwatchItem(itemID)
-	if not LibsFarmAssistant.session.watchedItems then
-		return
-	end
-
 	local key = tostring(itemID)
-	local item = LibsFarmAssistant.session.watchedItems[key]
+	local item = LibsFarmAssistant.char.watchedItems[key]
 	if item then
 		LibsFarmAssistant:Print('Stopped watching: ' .. (item.link or item.name or key))
-		LibsFarmAssistant.session.watchedItems[key] = nil
+		LibsFarmAssistant.char.watchedItems[key] = nil
 		LibsFarmAssistant:UpdateDisplay()
 	end
 end
@@ -147,7 +139,7 @@ end
 ---Get the watched items table
 ---@return table watchedItems
 function ItemDragDrop:GetWatchedItems()
-	return LibsFarmAssistant.session.watchedItems or {}
+	return LibsFarmAssistant.char.watchedItems
 end
 
 -- Bridge methods

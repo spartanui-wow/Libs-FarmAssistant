@@ -1,217 +1,120 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
--- Quality colors
-local QUALITY_COLORS = {
-	[0] = { r = 0.62, g = 0.62, b = 0.62 }, -- Poor
-	[1] = { r = 1, g = 1, b = 1 }, -- Common
-	[2] = { r = 0.12, g = 1, b = 0 }, -- Uncommon
-	[3] = { r = 0, g = 0.44, b = 0.87 }, -- Rare
-	[4] = { r = 0.64, g = 0.21, b = 0.93 }, -- Epic
-	[5] = { r = 1, g = 0.50, b = 0 }, -- Legendary
-}
+-- The broker and minimap tooltip: this session in the same order as the Overview page.
 
----Get a colored trend arrow comparing current rate to historical average
----@param currentRate number
----@param historicalAvg number
----@return string arrow Colored UTF-8 arrow or empty string
-local function GetTrendArrow(currentRate, historicalAvg)
-	if historicalAvg <= 0 then
-		return ''
-	end
-	if currentRate > historicalAvg * 1.05 then
-		return ' |cff00ff00\226\150\178|r' -- green ▲
-	elseif currentRate < historicalAvg * 0.95 then
-		return ' |cffff0000\226\150\188|r' -- red ▼
-	end
-	return ''
+local T = LibsFarmAssistant.Theme
+local C = T.color
+local Ledger = LibsFarmAssistant.Ledger
+local Format = LibsFarmAssistant.Format
+
+local TOP_ITEMS = 6
+
+local function Line(tooltip, left, right, color, rightColor)
+	color = color or C.muted
+	rightColor = rightColor or C.text
+	tooltip:AddDoubleLine(left, right, color[1], color[2], color[3], rightColor[1], rightColor[2], rightColor[3])
 end
 
+local function Heading(tooltip, text)
+	tooltip:AddLine(' ')
+	tooltip:AddLine(text, C.gold[1], C.gold[2], C.gold[3])
+end
+
+---@param tooltip GameTooltip
 function LibsFarmAssistant:BuildTooltip(tooltip)
-	local session = self.session
-	local hours = self:GetSessionHours()
-	local duration = self:GetSessionDuration()
-	local averages = self:GetHistoryAverages()
+	local bucket = Ledger:Session()
+	local active = self:IsSessionActive()
 
-	-- Title
-	tooltip:SetText("Lib's Farm Assistant")
+	tooltip:AddDoubleLine('Farm Assistant', (active and '' or 'Paused  ') .. Format.Clock(self:GetSessionDuration()), 1, 1, 1, active and C.text[1] or C.warn[1], active and C.text[2] or C.warn[2], active and C.text[3] or C.warn[3])
 
-	-- Session status
-	local status = self:IsSessionActive() and '|cff00ff00Active|r' or '|cffff0000Paused|r'
-	tooltip:AddDoubleLine('Session: ' .. status, self:FormatDuration(duration), 1, 1, 1, 0.7, 0.7, 0.7)
-
-	-- Personal best indicator
-	if hours > 0 then
-		local bests = self.dbobj.char.bestRates
-		local _, totalItems = self:GetItemCounts()
-		local currentItemRate = totalItems / hours
-		local currentGoldRate = self.session.money / hours
-		local honor = self.session.honor or 0
-		local currentHonorRate = honor / hours
-		local bestParts = {}
-		if bests.itemsPerHour > 0 and currentItemRate > bests.itemsPerHour then
-			table.insert(bestParts, 'Items')
-		end
-		if bests.goldPerHour > 0 and currentGoldRate > bests.goldPerHour then
-			table.insert(bestParts, 'Gold/hr')
-		end
-		if bests.honorPerHour > 0 and currentHonorRate > bests.honorPerHour then
-			table.insert(bestParts, 'Honor/hr')
-		end
-		if #bestParts > 0 then
-			tooltip:AddLine('* Personal Best: ' .. table.concat(bestParts, ', ') .. '!', 0, 1, 0)
-		end
+	local value = Ledger.TotalValue(bucket)
+	local rate = Ledger.PerHour(value, bucket)
+	Line(tooltip, 'Value', Format.Money(value) .. (rate and ('   ' .. Format.Money(rate) .. ' /hr') or ''), C.muted, C.gold)
+	local gold = Ledger.Money(bucket, 'loot')
+	if gold > 0 then
+		Line(tooltip, 'Gold looted', Format.Money(gold))
+	end
+	if bucket.kills > 0 then
+		local killRate = Ledger.PerHour(bucket.kills, bucket)
+		Line(tooltip, 'Kills', Format.Number(bucket.kills) .. (killRate and ('   ' .. Format.Rate(killRate) .. ' /hr') or ''))
+	end
+	if bucket.xp > 0 then
+		local seconds = self.ExperienceTracker:TimeToLevel(bucket)
+		Line(tooltip, 'Experience', Format.Short(bucket.xp) .. (seconds and ('   level in ' .. Format.Duration(seconds)) or ''))
+	end
+	if bucket.honor > 0 then
+		Line(tooltip, 'Honor', Format.Number(bucket.honor))
 	end
 
-	-- Items section
-	local uniqueItems, totalItems = self:GetItemCounts()
-	if totalItems > 0 then
-		tooltip:AddLine(' ')
-		local itemsPerHour = hours > 0 and (totalItems / hours) or 0
-		local itemRate = hours > 0 and string.format(' (%.0f/hr)', itemsPerHour) or ''
-		local itemArrow = GetTrendArrow(itemsPerHour, averages.itemsPerHour)
-		tooltip:AddLine(string.format('Items: %s looted%s%s', self:FormatNumber(totalItems), itemRate, itemArrow), 1, 0.82, 0)
-
-		-- Sort items by count descending
-		local sorted = {}
-		for _, item in pairs(session.items) do
-			table.insert(sorted, item)
-		end
-		table.sort(sorted, function(a, b)
+	local items = LibsFarmAssistant.Widgets.ItemRows(bucket)
+	if #items > 0 then
+		table.sort(items, function(a, b)
+			if a.value ~= b.value then
+				return a.value > b.value
+			end
 			return a.count > b.count
 		end)
+		Heading(tooltip, 'Top loot')
+		for i = 1, math.min(TOP_ITEMS, #items) do
+			local row = items[i]
+			Line(tooltip, row.name, Format.Number(row.count), T.quality[row.quality or 1])
+		end
+		if #items > TOP_ITEMS then
+			tooltip:AddLine(string.format('and %d more', #items - TOP_ITEMS), C.faint[1], C.faint[2], C.faint[3])
+		end
+	end
 
-		local maxItems = 10
-		for i, item in ipairs(sorted) do
-			if i > maxItems then
-				local remaining = #sorted - maxItems
-				tooltip:AddLine(string.format('  ...and %d more items', remaining), 0.5, 0.5, 0.5)
-				break
+	local hunts = {}
+	for _, hunt in ipairs(self.Hunts:List()) do
+		if not hunt.paused and not self.Hunts:IsCollected(hunt) then
+			hunts[#hunts + 1] = hunt
+		end
+	end
+	if #hunts > 0 then
+		Heading(tooltip, 'Hunts')
+		for _, hunt in ipairs(hunts) do
+			local meta = self.Pricing:Meta(hunt.id)
+			local right = Format.Number(hunt.attempts or 0) .. ' attempts'
+			if hunt.chance then
+				right = right .. '   ' .. Format.Percent(self.Hunts.ChanceByNow(hunt.chance, hunt.attempts or 0)) .. ' of players have it by now'
 			end
-			local rate = hours > 0 and string.format(' (%.1f/hr)', item.count / hours) or ''
-			local color = QUALITY_COLORS[item.quality] or QUALITY_COLORS[1]
-			tooltip:AddDoubleLine(string.format('  %s x%s', item.link or item.name, self:FormatNumber(item.count)), rate, color.r, color.g, color.b, 0.6, 0.6, 0.6)
+			Line(tooltip, meta.n or ('Item ' .. hunt.id), right, T.quality[meta.q or 1])
 		end
+	end
 
-		-- Estimated vendor value
-		if self.db.tracking.itemValue then
-			local vendorValue = self:GetTotalVendorValue()
-			if vendorValue > 0 then
-				local vendorRate = hours > 0 and string.format('  (%s/hr)', self:FormatMoney(vendorValue / hours)) or ''
-				tooltip:AddDoubleLine('  Est. Vendor Value: ' .. self:FormatMoney(vendorValue), vendorRate, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+	local gains = self.ReputationTracker:Gains(bucket)
+	if #gains > 0 then
+		Heading(tooltip, 'Standing')
+		for i = 1, math.min(3, #gains) do
+			local gain = gains[i]
+			Line(tooltip, gain.progress.name .. '  +' .. Format.Number(gain.gained), LibsFarmAssistant.Widgets.RepPace(gain), C.text, LibsFarmAssistant.Widgets.StandingColor(gain.progress))
+		end
+	end
+
+	local goals = {}
+	for _, goal in ipairs(self.db.goals) do
+		if goal.active then
+			goals[#goals + 1] = goal
+		end
+	end
+	if #goals > 0 then
+		Heading(tooltip, 'Goals')
+		for _, goal in ipairs(goals) do
+			local current, target, progress = self.GoalTracker:Progress(goal)
+			local eta = self.GoalTracker:ETA(goal)
+			local right = self.GoalTracker:FormatValue(goal, current) .. ' / ' .. self.GoalTracker:FormatValue(goal, target)
+			if progress >= 1 then
+				right = right .. '   done'
+			elseif eta then
+				right = right .. '   ' .. Format.Duration(eta)
 			end
+			Line(tooltip, self.GoalTracker:Name(goal), right, C.text, progress >= 1 and C.good or C.text)
 		end
 	end
 
-	-- Watched items that haven't been looted yet
-	local watchedItems = self:GetWatchedItems()
-	for key, watchInfo in pairs(watchedItems) do
-		if not session.items[key] then
-			-- Not yet looted — show as gray "watching" row
-			tooltip:AddDoubleLine(string.format('  %s', watchInfo.link or watchInfo.name or '?'), '(watching)', 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
-		end
-	end
-
-	-- Money section
-	if session.money > 0 then
-		tooltip:AddLine(' ')
-		local goldPerHour = hours > 0 and (session.money / hours) or 0
-		local moneyRate = hours > 0 and string.format(' (%s/hr)', self:FormatMoney(goldPerHour)) or ''
-		local moneyArrow = GetTrendArrow(goldPerHour, averages.goldPerHour)
-		tooltip:AddLine('Money: ' .. self:FormatMoney(session.money) .. moneyRate .. moneyArrow, 1, 0.82, 0)
-	end
-
-	-- Currency section
-	local hasCurrency = false
-	for _ in pairs(session.currencies) do
-		hasCurrency = true
-		break
-	end
-	if hasCurrency then
-		tooltip:AddLine(' ')
-		tooltip:AddLine('Currency:', 1, 0.82, 0)
-		for name, data in pairs(session.currencies) do
-			local rate = hours > 0 and string.format(' (%.1f/hr)', data.count / hours) or ''
-			tooltip:AddDoubleLine(string.format('  %s x%s', name, self:FormatNumber(data.count)), rate, 0.8, 0.8, 0.8, 0.6, 0.6, 0.6)
-		end
-	end
-
-	-- Reputation section
-	local hasRep = false
-	for _ in pairs(session.reputation) do
-		hasRep = true
-		break
-	end
-	if hasRep then
-		tooltip:AddLine(' ')
-		tooltip:AddLine('Reputation:', 1, 0.82, 0)
-		for faction, gained in pairs(session.reputation) do
-			local rate = hours > 0 and string.format(' (%.0f/hr)', gained / hours) or ''
-			tooltip:AddDoubleLine(string.format('  %s +%s', faction, self:FormatNumber(gained)), rate, 0.5, 1, 0.5, 0.6, 0.6, 0.6)
-		end
-	end
-
-	-- Honor section
-	local honor = session.honor or 0
-	if honor > 0 then
-		tooltip:AddLine(' ')
-		local honorPerHour = hours > 0 and (honor / hours) or 0
-		local honorRate = hours > 0 and string.format(' (%s/hr)', self:FormatNumber(honorPerHour)) or ''
-		local honorArrow = GetTrendArrow(honorPerHour, averages.honorPerHour)
-		tooltip:AddLine(string.format('Honor: %s%s%s', self:FormatNumber(honor), honorRate, honorArrow), 1, 0.82, 0)
-	end
-
-	-- Goals section
-	if self.db.goals and #self.db.goals > 0 then
-		local hasActiveGoal = false
-		for _, goal in ipairs(self.db.goals) do
-			if goal.active then
-				hasActiveGoal = true
-				break
-			end
-		end
-		if hasActiveGoal then
-			tooltip:AddLine(' ')
-			tooltip:AddLine('Goals:', 1, 0.82, 0)
-			for _, goal in ipairs(self.db.goals) do
-				if goal.active then
-					local current, target, progress = self:GetGoalProgress(goal)
-					local pct = math.floor(progress * 100)
-					local bar = self:BuildProgressBar(progress, 10)
-
-					-- Goal name
-					local goalName = goal.targetName or goal.type
-					if goal.type == 'item' then
-						local item = self.session.items[tostring(goal.targetItemID)]
-						goalName = (item and item.name) or goalName
-					elseif goal.type == 'money' then
-						goalName = 'Gold'
-					elseif goal.type == 'honor' then
-						goalName = 'Honor'
-					end
-
-					-- Progress text
-					local currentStr = self:FormatGoalValue(goal, current)
-					local targetStr = self:FormatGoalTarget(goal)
-
-					if progress >= 1 then
-						-- Completed
-						tooltip:AddLine(string.format('  \226\156\147 %s  %s/%s (100%%)', goalName, currentStr, targetStr), 0, 1, 0)
-					else
-						-- In progress with ETA
-						local eta = self:GetGoalETA(goal)
-						local etaStr = eta and string.format('  ~%s', eta) or ''
-						tooltip:AddDoubleLine(string.format('  [%s] %s', bar, goalName), string.format('%s/%s (%d%%)%s', currentStr, targetStr, pct, etaStr), 1, 1, 1, 0.7, 0.7, 0.7)
-					end
-				end
-			end
-		end
-	end
-
-	-- Click hints
 	tooltip:AddLine(' ')
-	tooltip:AddLine('|cffffff00Left Click:|r Dashboard | |cffffff00Right Click:|r Pause/Resume')
-	tooltip:AddLine('|cffffff00Shift+Click:|r Reset Session')
-
+	tooltip:AddLine('Click: window   Right-click: pause   Middle-click: tracker', C.faint[1], C.faint[2], C.faint[3])
+	tooltip:AddLine('Shift-click: new session   Scroll: change the text shown', C.faint[1], C.faint[2], C.faint[3])
 	tooltip:Show()
 end

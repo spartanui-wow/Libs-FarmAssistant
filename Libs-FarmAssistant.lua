@@ -6,51 +6,50 @@ _G.LibsFarmAssistant = LibsFarmAssistant
 
 LibsFarmAssistant:SetDefaultModuleLibraries('AceEvent-3.0', 'AceTimer-3.0')
 
-LibsFarmAssistant.version = '1.0.0'
+LibsFarmAssistant.version = '2.0.0'
 LibsFarmAssistant.addonName = "Lib's Farm Assistant"
+LibsFarmAssistant.icon = 'Interface/Addons/Libs-FarmAssistant/Logo-Icon'
+
+-- Screens refresh from one throttled message instead of on every loot, kill and coin.
+local UPDATE_THROTTLE = 0.25
 
 function LibsFarmAssistant:OnInitialize()
 	if LibAT and LibAT.Logger then
 		self.logger = LibAT.Logger.RegisterAddon('LibsFarmAssistant')
 	end
 
+	self:RegisterChatCommand('farm', 'SlashCommand')
 	self:RegisterChatCommand('libsfa', 'SlashCommand')
 	self:RegisterChatCommand('farmassist', 'SlashCommand')
 end
 
 function LibsFarmAssistant:OnEnable()
-	-- Modules auto-enable via Ace3 lifecycle
-
-	-- Register with Addon Compartment (10.x+ dropdown)
 	if AddonCompartmentFrame and AddonCompartmentFrame.RegisterAddon then
 		AddonCompartmentFrame:RegisterAddon({
-			text = "Lib's Farm Assistant",
-			icon = 'Interface/Addons/Libs-FarmAssistant/Logo-Icon',
+			text = self.addonName,
+			icon = self.icon,
 			registerForAnyClick = true,
 			notCheckable = true,
 			func = function(_, _, _, _, mouseButton)
-				if mouseButton == 'LeftButton' then
-					self:ToggleSession()
-				else
+				if mouseButton == 'RightButton' then
 					self:OpenOptions()
+				else
+					self:ToggleWindow()
 				end
 			end,
-			funcOnEnter = function()
-				GameTooltip:SetOwner(AddonCompartmentFrame, 'ANCHOR_CURSOR_RIGHT')
-				GameTooltip:AddLine("|cffffffffLib's|r |cffe21f1fFarm Assistant|r", 1, 1, 1)
-				GameTooltip:AddLine(' ')
-				GameTooltip:AddLine('|cffeda55fLeft-Click|r to toggle farming session.', 1, 1, 1)
-				GameTooltip:AddLine('|cffeda55fRight-Click|r to open options.', 1, 1, 1)
-				GameTooltip:Show()
+			funcOnEnter = function(button)
+				GameTooltip:SetOwner(button or AddonCompartmentFrame, 'ANCHOR_CURSOR_RIGHT')
+				self:BuildTooltip(GameTooltip)
+			end,
+			funcOnLeave = function()
+				GameTooltip:Hide()
 			end,
 		})
 	end
 
-	-- Register setup wizard page
-	self:RegisterSetupWizard()
-
-	-- Update display every 60 seconds for rate calculations
-	self:ScheduleRepeatingTimer('UpdateDisplay', 60)
+	if self.RegisterSetupWizard then
+		self:RegisterSetupWizard()
+	end
 
 	self:Log("Lib's Farm Assistant loaded", 'info')
 end
@@ -60,22 +59,45 @@ function LibsFarmAssistant:OnDisable()
 	self:CancelAllTimers()
 end
 
-function LibsFarmAssistant:SlashCommand(input)
-	input = input and input:trim():lower() or ''
+local HELP = {
+	'/farm - open the window',
+	'/farm tracker - show or hide the compact tracker',
+	'/farm pause - pause or resume tracking',
+	'/farm new - start a new session',
+	'/farm hunt <item link or ID> - start hunting an item',
+	'/farm summary - print this session to chat',
+	'/farm options - open settings',
+}
 
-	if input == '' or input == 'config' or input == 'options' then
+function LibsFarmAssistant:SlashCommand(input)
+	input = input and strtrim(input) or ''
+	local command, rest = input:match('^(%S*)%s*(.-)$')
+	command = (command or ''):lower()
+
+	if command == '' or command == 'show' or command == 'window' or command == 'popup' or command == 'dashboard' then
+		self:ToggleWindow()
+	elseif command == 'options' or command == 'config' then
 		self:OpenOptions()
-	elseif input == 'reset' then
-		self:ResetSession()
-		self:Print('Session reset')
-	elseif input == 'pause' or input == 'toggle' then
+	elseif command == 'tracker' then
+		self:ToggleTracker()
+	elseif command == 'pause' or command == 'toggle' or command == 'resume' then
 		self:ToggleSession()
-	elseif input == 'summary' then
+	elseif command == 'new' or command == 'reset' then
+		self:ResetSession()
+	elseif command == 'summary' then
 		self:PrintSummary()
-	elseif input == 'popup' or input == 'dashboard' then
-		self:TogglePopup()
+	elseif command == 'hunt' then
+		local itemID = self.Compat.ItemIDFromLink(rest) or tonumber(rest)
+		if not itemID then
+			self:Print('Usage: /farm hunt [item link or ID]')
+			return
+		end
+		local _, added = self.Hunts:Add(itemID)
+		self:Print(added and 'Hunt started. Attempts count from now.' or 'Already hunting that item.')
 	else
-		self:Print('Commands: /farmassist [config|reset|pause|summary|popup]')
+		for _, line in ipairs(HELP) do
+			self:Print(line)
+		end
 	end
 end
 
@@ -86,11 +108,22 @@ function LibsFarmAssistant:Log(message, level)
 	end
 end
 
--- Bridge methods for modules
+---Asks every screen to redraw, at most four times a second.
 function LibsFarmAssistant:UpdateDisplay()
-	if self.DataBroker then
-		self.DataBroker:UpdateDisplay()
+	if self.updatePending then
+		return
 	end
+	self.updatePending = true
+	C_Timer.After(UPDATE_THROTTLE, function()
+		self.updatePending = false
+		if self.CheckSessionNotification then
+			self:CheckSessionNotification()
+		end
+		if self.CheckGoalCompletion then
+			self:CheckGoalCompletion()
+		end
+		self:SendMessage('LIBSFA_UPDATE')
+	end)
 end
 
 function LibsFarmAssistant:OpenOptions()
@@ -99,8 +132,14 @@ function LibsFarmAssistant:OpenOptions()
 	end
 end
 
-function LibsFarmAssistant:TogglePopup()
-	if self.PopupWindow then
-		self.PopupWindow:TogglePopup()
+function LibsFarmAssistant:ToggleWindow(page)
+	if self.Window then
+		self.Window:Toggle(page)
+	end
+end
+
+function LibsFarmAssistant:ToggleTracker()
+	if self.Tracker then
+		self.Tracker:Toggle()
 	end
 end
