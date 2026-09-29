@@ -5,7 +5,7 @@
 ## Version: @project-version@
 ## Author: Wutname1
 ## SavedVariables: LibsFarmAssistantDB
-## OptionalDeps: Libs-DataBar, Libs-AddonTools
+## OptionalDeps: Libs-DataBar, LibsAddonTools
 ## Category: Data Broker
 ## Category-deDE: Datenbroker
 ## Category-esES: Intermediario de Datos
