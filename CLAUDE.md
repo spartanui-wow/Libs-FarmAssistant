@@ -33,7 +33,9 @@ Core/
   CurrencyTracker.lua         CURRENCY_DISPLAY_UPDATE; honor (currency on Mists+, chat on older)
   ReputationTracker.lua       Monotonic faction totals diffed; chat as a hint; Gains(bucket) for UI
   ExperienceTracker.lua       UnitXP deltas across level-ups; time/kills to level
-  Hunts.lua                   Attempt counting, drop history, sources, luck math
+  Lockouts.lua                Raid, dungeon and world boss saves per character (account-wide),
+                              boss matching by name, per-character hunt counts, weekly summaries
+  Hunts.lua                   Attempt counting, drop history, sources, bosses, luck math, shared hunts
   GoalTracker.lua             Session goals with ETA
   Notifications.lua, SmartSession.lua
   Looting/                    Auto-loot: priority modules; only decides what to take
@@ -71,6 +73,12 @@ Every bucket (session, `char.days[YYYY-MM-DD]`, `char.months[YYYY-MM]`, `char.li
   62 days are pruned; months and lifetime keep totals.
 - `global.itemMeta` / `global.sourceMeta` are account-wide name caches.
 - `char.sessions` holds short summaries (last 100). `char.hunts[itemID string]` holds hunts.
+- `global.characters[AceDB char key]` = { name, realm, class, level, scanned, lockouts, hunts }:
+  each character's saves (`GetSavedInstanceInfo` / `GetSavedInstanceEncounterInfo` /
+  `GetSavedWorldBossInfo`, rescanned on `UPDATE_INSTANCE_INFO`, asked for with `RequestRaidInfo`
+  at login and a few seconds after each boss kill) and a snapshot of its hunt counts.
+- `global.sharedHunts[itemID string]` = { sources, bosses, chance, mode }: hunts every character
+  picks up at login (`Hunts:SyncShared`). Mounts, pets and toys are shared by default.
 
 ## Rules that keep counts honest
 
@@ -85,12 +93,20 @@ Every bucket (session, `char.days[YYYY-MM-DD]`, `char.months[YYYY-MM]`, `char.li
 - Money: an open loot/merchant/mail/quest window outranks one that closed a moment ago.
 - Everything checks `IsSessionActive()`; pausing stops the clock and the counting.
 
+## Lockouts
+
+Bosses are matched by name, the only thing lockout lists and kill events share. A hunt's boss
+names are: bosses linked by hand (`hunt.bosses`), its encounter sources (`e:`), and creature
+sources whose name appears in some lockout or encounter (so ordinary mobs never count). A
+character is "done" when a lockout that has not reset lists one of those bosses as killed. Each
+hunt also keeps `weekKey`/`weekAttempts` (week = since the weekly reset).
+
 ## Messages
 
 `LIBSFA_UPDATE` (throttled redraw), `LIBSFA_SESSION_STARTED`, `LIBSFA_SESSION_STATE`,
 `LIBSFA_TIME_ADDED(seconds)`, `LIBSFA_ATTEMPT(sourceKey)`, `LIBSFA_ITEM_GAINED(itemID, qty, sourceKey, link)`,
 `LIBSFA_REP_GAINED`, `LIBSFA_CURRENCY_GAINED`, `LIBSFA_HUNTS_CHANGED`, `LIBSFA_HUNTS_UPDATED`,
-`LIBSFA_ITEM_LOADED`, `LIBSFA_SETTINGS_CHANGED`.
+`LIBSFA_ITEM_LOADED`, `LIBSFA_SETTINGS_CHANGED`, `LIBSFA_LOCKOUTS_UPDATED`.
 
 ## UI rules
 
@@ -125,3 +141,6 @@ In game, check:
 9. /reload: everything persists; the window reopens on the same page and range.
 10. Item and creature tooltips show farming lines only when there is data.
 11. Classic Era and Mists: no errors, rep and honor still counted.
+12. Add a mount hunt, open Characters, Add a boss (from a saved raid): kill it and the row turns
+    "Done, resets in ...". Log in on an alt: the hunt appears there, and the first character's row
+    shows its lockout and counts.

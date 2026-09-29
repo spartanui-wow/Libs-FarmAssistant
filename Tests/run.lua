@@ -397,6 +397,82 @@ H.test('purchases are not rewards', function()
 	H.advance(5)
 end)
 
+H.test('raid lockouts per character', function()
+	H.state.items[49636] = { name = 'Reins of the Onyxian Drake', quality = 4, sellPrice = 0, bindType = 1 }
+	local L = A.Lockouts
+	local hunt = A.Hunts:Add(49636, true)
+	A.Hunts:AddBoss(49636, 'Onyxia')
+	H.eq(L:MyStatus(hunt), 'open', 'no lockout yet')
+	H.saved = { { name = "Onyxia's Lair", reset = 3 * 86400, difficulty = '40 Player', bosses = { { name = 'Onyxia', killed = false } } } }
+	RequestRaidInfo()
+	H.eq(L:MyStatus(hunt), 'open', 'saved but boss alive')
+	local before = hunt.attempts
+	H.kill(10184, 'Onyxia', 1200)
+	H.eq(hunt.attempts, before + 1, 'boss linked by name counts')
+	H.eq(hunt.weekAttempts, 1, 'weekly count')
+	H.saved[1].bosses[1].killed = true
+	H.fire('ENCOUNTER_END', 1084, 'Onyxia', 1, 40, 1)
+	H.advance(5)
+	local status, reset = L:MyStatus(hunt)
+	H.eq(status, 'done', 'boss killed this lockout')
+	H.ok(reset and reset > time() + 2 * 86400, 'reset time kept')
+
+	A.global.characters['Alt - Testrealm'] = {
+		name = 'Alt',
+		realm = 'Testrealm',
+		class = 'PRIEST',
+		level = 60,
+		scanned = time(),
+		lockouts = {},
+		hunts = { ['49636'] = { attempts = 5, total = 12, week = 1, weekKey = Ledger.WeekStartKey() } },
+	}
+	A.global.characters['Gone - Testrealm'] = {
+		name = 'Gone',
+		scanned = time() - 10 * 86400,
+		lockouts = { { instance = "Onyxia's Lair", difficulty = '', raid = true, reset = time() - 86400, bosses = { { name = 'Onyxia', killed = true } } } },
+		hunts = { ['49636'] = { attempts = 1, total = 1, week = 3, weekKey = '2020-01-01' } },
+	}
+	local rows = L:HuntRows(hunt)
+	H.eq(#rows, 3, 'three characters hunting it')
+	H.eq(rows[1].current, true, 'current character first')
+	local summary = L:Summary(hunt)
+	H.eq(summary.characters, 3, 'account characters')
+	H.eq(summary.open, 2, 'alt and expired lockout can still try')
+	H.eq(summary.done, 1, 'this character is done')
+	H.eq(summary.week, 2, 'old weeks do not count this week')
+	H.eq(summary.total, 12 + 1 + hunt.totalAttempts, 'account total')
+end)
+
+H.test('shared hunts reach other characters', function()
+	A.global.sharedHunts['12345'] = { sources = { ['c:777'] = true }, bosses = { kazzak = 'Kazzak' }, chance = 0.01, mode = 'sources' }
+	A.Hunts:SyncShared()
+	local hunt = A.Hunts:Get(12345)
+	H.ok(hunt, 'shared hunt created here')
+	H.eq(hunt.chance, 0.01, 'chance copied')
+	H.eq(hunt.bosses.kazzak, 'Kazzak', 'bosses copied')
+	H.eq(hunt.shared, true, 'marked shared')
+	A.Hunts:SetShared(12345, false)
+	H.eq(A.global.sharedHunts['12345'], nil, 'stop sharing')
+	H.worldBosses = { { name = 'Kazzak', reset = 86400 } }
+	RequestRaidInfo()
+	local found = false
+	for _, boss in ipairs(A.Lockouts:KnownBosses()) do
+		if boss.name == 'Kazzak' and boss.detail == 'World boss' then
+			found = true
+		end
+	end
+	H.ok(found, 'world bosses offered')
+	H.eq(A.Lockouts:MyStatus(hunt), 'done', 'world boss lockout counts')
+	A.Hunts:Remove(12345)
+end)
+
+H.test('ordinary mobs are not lockout bosses', function()
+	local hunt = A.Hunts:Add(21383, false)
+	hunt.sources['c:7440'] = true
+	H.eq(A.Lockouts:HasBosses(hunt), false, 'a trash mob source has no lockout')
+	A.Hunts:Remove(21383)
+end)
+
 if not coreOnly then
 	H.test('ui smoke', function()
 		A:ToggleWindow()
@@ -451,6 +527,12 @@ if not coreOnly then
 		H.ok(#GameTooltip.lines >= 2, 'unit tooltip lines: ' .. table.concat(GameTooltip.lines, '; '))
 		local lines = A.Tracker:Lines()
 		H.ok(#lines >= 1, 'tracker has lines')
+		hunts.selected = 49636
+		hunts.view = 'characters'
+		A.Window:ShowPage('hunts')
+		H.ok(hunts.accountText.text and hunts.accountText.text:find('across 3 characters'), 'account line: ' .. tostring(hunts.accountText.text))
+		H.ok(hunts.bossText.text == 'Onyxia', 'boss list shown')
+		hunts.view = 'details'
 		A:SlashCommand('hunt ' .. H.Link(4306))
 		H.ok(A.Hunts:Get(4306), 'slash hunt')
 	end)

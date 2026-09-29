@@ -867,6 +867,37 @@ C_ChatInfo = {
 	end,
 }
 
+-- Saved instances: { name, reset, difficulty, raid, locked, bosses = { { name, killed } } }
+H.saved = {}
+H.worldBosses = {}
+function GetNumSavedInstances()
+	return #H.saved
+end
+function GetSavedInstanceInfo(i)
+	local l = H.saved[i]
+	local killed = 0
+	for _, b in ipairs(l.bosses) do
+		if b.killed then
+			killed = killed + 1
+		end
+	end
+	return l.name, 1000 + i, l.reset, 3, l.locked ~= false, false, 0, l.raid ~= false, 40, l.difficulty or 'Normal', #l.bosses, killed, false, 249
+end
+function GetSavedInstanceEncounterInfo(i, j)
+	local b = H.saved[i].bosses[j]
+	return b.name, 0, b.killed, false
+end
+function GetNumSavedWorldBosses()
+	return #H.worldBosses
+end
+function GetSavedWorldBossInfo(i)
+	local w = H.worldBosses[i]
+	return w.name, 100 + i, w.reset
+end
+function RequestRaidInfo()
+	H.fire('UPDATE_INSTANCE_INFO')
+end
+
 ---Opens a loot window, takes every slot, closes it.
 ---@param slots table[] { link or itemID, quantity, guid, type }
 function H.loot(slots, opts)
