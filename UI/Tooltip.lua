@@ -79,6 +79,9 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 			if hunt.chance then
 				right = right .. '   ' .. Format.Percent(self.Hunts.ChanceByNow(hunt.chance, hunt.attempts or 0)) .. ' of players have it by now'
 			end
+			if self.Lockouts:MyStatus(hunt) == 'done' then
+				right = right .. '   saved'
+			end
 			Line(tooltip, meta.n or ('Item ' .. hunt.id), right, T.quality[meta.q or 1])
 		end
 	end

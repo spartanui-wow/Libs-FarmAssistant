@@ -151,6 +151,29 @@ function Page:CreateDetail(parent)
 	sub:SetPoint('RIGHT')
 	self.sub = sub
 
+	local views = W.Segmented(detail, {
+		{ key = 'details', label = 'Details' },
+		{ key = 'characters', label = 'Characters', tooltip = 'Which of your characters can still try for it before the lockout resets.' },
+	}, function(key)
+		self.view = key
+		self:Refresh()
+	end)
+	views:SetPoint('TOPRIGHT')
+	views:Select('details')
+	self.views = views
+	self.view = 'details'
+	name:SetPoint('RIGHT', views, 'LEFT', -8, 0)
+	sub:SetPoint('RIGHT', views, 'LEFT', -8, 0)
+
+	self:CreateCharacters(detail, icon)
+
+	-- Everything below the title belongs to the Details view.
+	local body = CreateFrame('Frame', nil, detail)
+	body:SetPoint('TOPLEFT', icon, 'BOTTOMLEFT', 0, 0)
+	body:SetPoint('BOTTOMRIGHT')
+	self.body = body
+	detail = body
+
 	local attempts = Stat(detail, 'attempts')
 	attempts:SetPoint('TOPLEFT', icon, 'BOTTOMLEFT', 0, -14)
 	self.attempts = attempts
@@ -216,9 +239,8 @@ function Page:CreateDetail(parent)
 		{ key = 'sources', label = 'These sources', tooltip = 'Only kills and opens of the sources below count.' },
 		{ key = 'any', label = 'Every kill', tooltip = 'Every kill, node and catch counts. Good for world drops.' },
 	}, function(key)
-		local hunt = self.selected and LibsFarmAssistant.Hunts:Get(self.selected)
-		if hunt then
-			hunt.mode = key
+		if self.selected then
+			LibsFarmAssistant.Hunts:SetMode(self.selected, key)
 			self:Refresh()
 		end
 	end)
@@ -310,7 +332,7 @@ function Page:CreateDetail(parent)
 	stop:SetPoint('BOTTOMRIGHT')
 
 	local none = CreateFrame('Frame', nil, parent)
-	none:SetAllPoints(detail)
+	none:SetAllPoints(self.detail)
 	local noneTitle = T.Text(none, 14, C.text)
 	noneTitle:SetPoint('TOPLEFT', 0, -40)
 	noneTitle:SetText('Hunt a rare drop')
@@ -385,6 +407,9 @@ function Page:Refresh()
 		parts[#parts + 1] = KIND_LABEL[kind] .. (collected and ', collected' or ', not collected')
 	end
 	parts[#parts + 1] = string.format('hunting since %s', date('%b %d', hunt.added))
+	if hunt.shared then
+		parts[#parts + 1] = 'all characters'
+	end
 	if hunt.paused then
 		parts[#parts + 1] = 'paused'
 	end
@@ -433,4 +458,188 @@ function Page:Refresh()
 	end
 
 	self.pauseButton:SetLabel(hunt.paused and 'Resume' or 'Pause')
+
+	self.views:Select(self.view)
+	self.body:SetShown(self.view ~= 'characters')
+	self.characters:SetShown(self.view == 'characters')
+	if self.view == 'characters' then
+		self:RefreshCharacters(hunt)
+	end
+end
+
+---@param detail Frame
+---@param icon Texture
+function Page:CreateCharacters(detail, icon)
+	local view = CreateFrame('Frame', nil, detail)
+	view:SetPoint('TOPLEFT', icon, 'BOTTOMLEFT', 0, -14)
+	view:SetPoint('BOTTOMRIGHT')
+	view:Hide()
+	self.characters = view
+
+	local heading = W.Heading(view, 'This week')
+	heading:SetPoint('TOPLEFT')
+	heading:SetPoint('RIGHT')
+	self.weekHeading = heading
+
+	local STATUS_TEXT = {
+		open = 'Can still try',
+		unknown = 'Not checked yet',
+	}
+	local rows = W.Table(view, {
+		{ key = 'name', title = 'Character', flex = true },
+		{ key = 'status', title = 'Lockout', width = 136 },
+		{ key = 'week', title = 'This week', width = 58, align = 'RIGHT', figures = true },
+		{ key = 'attempts', title = 'Since drop', width = 64, align = 'RIGHT', figures = true },
+	}, {
+		cell = function(row, col)
+			if col.key == 'name' then
+				local color = row.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[row.class]
+				return row.name .. (row.current and T.Wrap('  you', C.faint) or ''), color and { color.r, color.g, color.b } or C.text
+			elseif col.key == 'status' then
+				if row.status == 'done' then
+					return 'Done, resets in ' .. Format.Duration((row.reset or time()) - time()), C.muted
+				elseif row.status == 'unknown' and not self.hasBosses then
+					return 'No boss linked', C.faint
+				end
+				return STATUS_TEXT[row.status] or row.status, row.status == 'open' and C.good or C.faint
+			elseif col.key == 'week' then
+				return row.hasHunt and Format.Number(row.week) or '-', C.muted
+			end
+			return row.hasHunt and Format.Number(row.attempts) or '-'
+		end,
+		onEnter = function(rowFrame, row)
+			GameTooltip:SetOwner(rowFrame, 'ANCHOR_RIGHT')
+			GameTooltip:SetText(row.name .. (row.realm ~= '' and (' - ' .. row.realm) or ''), 1, 1, 1)
+			GameTooltip:AddLine('Level ' .. row.level, C.muted[1], C.muted[2], C.muted[3])
+			if row.lockout then
+				local lockout = row.lockout
+				local where = lockout.instance .. (lockout.difficulty ~= '' and (', ' .. lockout.difficulty) or '')
+				GameTooltip:AddDoubleLine('Saved to', where, C.muted[1], C.muted[2], C.muted[3], 1, 1, 1)
+				GameTooltip:AddDoubleLine('Resets', date('%A %H:%M', lockout.reset), C.muted[1], C.muted[2], C.muted[3], 1, 1, 1)
+			elseif row.status == 'unknown' then
+				GameTooltip:AddLine('Log in on this character once to read its lockouts.', C.muted[1], C.muted[2], C.muted[3], true)
+			end
+			if row.hasHunt then
+				GameTooltip:AddDoubleLine('Attempts in total', Format.Number(row.total), C.muted[1], C.muted[2], C.muted[3], 1, 1, 1)
+			else
+				GameTooltip:AddLine('Not hunting this item. Share the hunt to count on every character.', C.muted[1], C.muted[2], C.muted[3], true)
+			end
+			GameTooltip:Show()
+		end,
+	})
+	rows:SetPoint('TOPLEFT', heading, 'BOTTOMLEFT', 0, -2)
+	rows:SetPoint('RIGHT')
+	self.characterRows = rows
+
+	local account = T.Text(view, 11, C.muted)
+	account:SetPoint('BOTTOMLEFT', view, 'BOTTOMLEFT', 0, 98)
+	account:SetPoint('RIGHT')
+	self.accountText = account
+	rows:SetPoint('BOTTOM', account, 'TOP', 0, 8)
+
+	local bossHeading = W.Heading(view, 'Bosses')
+	bossHeading:SetPoint('TOPLEFT', account, 'BOTTOMLEFT', 0, -12)
+	bossHeading:SetPoint('RIGHT')
+	bossHeading.aside:SetText('lockouts and attempts follow these')
+	local bosses = T.Text(view, 11, C.text)
+	bosses:SetPoint('TOPLEFT', bossHeading, 'BOTTOMLEFT', 0, -4)
+	bosses:SetPoint('RIGHT')
+	bosses:SetWordWrap(true)
+	bosses:SetJustifyV('TOP')
+	self.bossText = bosses
+
+	local addBoss = W.Button(view, 'Add a boss', {
+		onClick = function(btn)
+			if not self.selected then
+				return
+			end
+			local items = {}
+			for _, boss in ipairs(LibsFarmAssistant.Lockouts:KnownBosses()) do
+				items[#items + 1] = { text = boss.name, detail = boss.detail, value = boss }
+			end
+			W.Menu(btn, items, function(item)
+				local boss = item.value
+				if boss.key then
+					LibsFarmAssistant.Hunts:AddSource(self.selected, boss.key)
+				end
+				LibsFarmAssistant.Hunts:AddBoss(self.selected, boss.name)
+				self:Refresh()
+			end, 'No bosses yet. Kill the boss once, or open the raid info panel on a saved character.')
+		end,
+		tooltip = { 'Add a boss', 'Pick the boss that drops it. Its kills count as attempts and its lockout shows for every character.' },
+	})
+	addBoss:SetPoint('BOTTOMLEFT')
+
+	local clear = W.Button(view, 'Clear bosses', {
+		quiet = true,
+		onClick = function()
+			local hunt = self.selected and LibsFarmAssistant.Hunts:Get(self.selected)
+			if hunt then
+				for lower in pairs(hunt.bosses or {}) do
+					LibsFarmAssistant.Hunts:RemoveBoss(hunt.id, lower)
+				end
+				self:Refresh()
+			end
+		end,
+		tooltip = { 'Clear bosses', 'Removes the bosses you added by hand. Mobs it dropped from stay on the Details view.' },
+	})
+	clear:SetPoint('LEFT', addBoss, 'RIGHT', 6, 0)
+
+	local share = W.Button(view, 'Hunt on all characters', {
+		quiet = true,
+		onClick = function()
+			local hunt = self.selected and LibsFarmAssistant.Hunts:Get(self.selected)
+			if hunt then
+				LibsFarmAssistant.Hunts:SetShared(hunt.id, not hunt.shared)
+				self:Refresh()
+			end
+		end,
+		tooltip = { 'Hunt on all characters', 'Every character you log in on starts counting this hunt, and the counts add up here.' },
+	})
+	share:SetPoint('BOTTOMRIGHT')
+	self.shareButton = share
+
+	view:SetScript('OnHide', W.CloseMenu)
+end
+
+---@param hunt FarmHunt
+function Page:RefreshCharacters(hunt)
+	local Lockouts = LibsFarmAssistant.Lockouts
+	local names = Lockouts:BossNames(hunt)
+	self.hasBosses = next(names) ~= nil
+
+	local list = Lockouts:HuntRows(hunt)
+	self.characterRows:SetData(list, 'No characters yet.')
+
+	local summary = Lockouts:Summary(hunt)
+	if self.hasBosses and summary.characters > 0 then
+		self.weekHeading.aside:SetText(string.format('%d of %d can still try', summary.open, summary.characters))
+	else
+		self.weekHeading.aside:SetText('')
+	end
+
+	local account
+	if summary.characters > 1 then
+		account = string.format('%s attempts on the account across %d characters, %s this week.', Format.Number(summary.total), summary.characters, Format.Number(summary.week))
+	else
+		account = string.format('%s attempts in total, %s this week.', Format.Number(summary.total), Format.Number(summary.week))
+	end
+	if not hunt.shared then
+		account = account .. ' Only this character counts it.'
+	end
+	self.accountText:SetText(account)
+
+	local display = {}
+	for _, name in pairs(names) do
+		display[#display + 1] = name
+	end
+	table.sort(display)
+	if #display > 0 then
+		self.bossText:SetText(table.concat(display, ', '))
+		T.Color(self.bossText, C.text)
+	else
+		self.bossText:SetText('None yet. Add the boss that drops it to see which characters can still try this week.')
+		T.Color(self.bossText, C.muted)
+	end
+	self.shareButton:SetLabel(hunt.shared and 'Stop sharing' or 'Hunt on all characters')
 end

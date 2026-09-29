@@ -24,6 +24,10 @@ local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 ---@field mode string 'sources' or 'any'
 ---@field chance number|nil 0-1, set by the player
 ---@field paused boolean|nil
+---@field bosses table<string, string>|nil lower-case boss name -> display name, linked by hand
+---@field shared boolean|nil hunted on every character of the account
+---@field weekKey string|nil first day of the week weekAttempts belongs to
+---@field weekAttempts number|nil
 
 ---@class LibsFarmAssistant.Hunts : AceModule, AceEvent-3.0
 local Hunts = LibsFarmAssistant:NewModule('Hunts')
@@ -37,6 +41,7 @@ local lastAttempt = {} -- hunt key -> { at, kind } of its last counted attempt
 local lastFound = {} -- hunt key -> GetTime() of its last recorded drop
 
 function Hunts:OnEnable()
+	self:SyncShared()
 	self:RegisterMessage('LIBSFA_ATTEMPT', 'OnAttempt')
 	self:RegisterMessage('LIBSFA_ITEM_GAINED', 'OnItemGained')
 	self:RegisterMessage('LIBSFA_TIME_ADDED', 'OnTimeAdded')
@@ -82,10 +87,65 @@ function Hunts:Count()
 	return n
 end
 
+---@return table<string, table>
+local function Shared()
+	return LibsFarmAssistant.global.sharedHunts
+end
+
+---Copies what a shared hunt knows (sources, bosses, chance, mode) into the account-wide entry.
+---@param hunt FarmHunt
+function Hunts:Publish(hunt)
+	if not hunt.shared then
+		return
+	end
+	local entry = Shared()[tostring(hunt.id)] or {}
+	entry.sources = entry.sources or {}
+	entry.bosses = entry.bosses or {}
+	for key in pairs(hunt.sources) do
+		entry.sources[key] = true
+	end
+	for lower, display in pairs(hunt.bosses or {}) do
+		entry.bosses[lower] = display
+	end
+	entry.chance = hunt.chance
+	entry.mode = hunt.mode
+	Shared()[tostring(hunt.id)] = entry
+end
+
+---Brings in hunts other characters share, and what they learned about hunts this one shares.
+function Hunts:SyncShared()
+	local hunts = All()
+	for key, entry in pairs(Shared()) do
+		local itemID = tonumber(key)
+		local hunt = hunts[key]
+		-- Read the shared settings first: creating the hunt publishes it back over the entry.
+		local chance, mode = entry.chance, entry.mode
+		if not hunt and itemID then
+			hunt = self:Add(itemID, true)
+		end
+		if hunt then
+			hunt.shared = true
+			hunt.bosses = hunt.bosses or {}
+			for source in pairs(entry.sources or {}) do
+				hunt.sources[source] = true
+			end
+			for lower, display in pairs(entry.bosses or {}) do
+				hunt.bosses[lower] = display
+			end
+			if chance and not hunt.chance then
+				hunt.chance = chance
+			end
+			hunt.mode = mode or hunt.mode
+			self:Publish(hunt)
+		end
+	end
+end
+
 ---@param itemID number
+---@param shared? boolean hunt on every character; defaults to yes for mounts, pets and toys
 ---@return FarmHunt|nil hunt
 ---@return boolean added False when the hunt already existed
-function Hunts:Add(itemID)
+function Hunts:Add(itemID, shared)
 	if not itemID then
 		return nil, false
 	end
@@ -93,6 +153,9 @@ function Hunts:Add(itemID)
 	local hunts = All()
 	if hunts[key] then
 		return hunts[key], false
+	end
+	if shared == nil then
+		shared = Compat.Collectible(itemID) ~= nil
 	end
 	---@type FarmHunt
 	local hunt = {
@@ -104,7 +167,9 @@ function Hunts:Add(itemID)
 		totalTime = 0,
 		found = {},
 		sources = {},
+		bosses = {},
 		mode = 'sources',
+		shared = shared or nil,
 	}
 	-- Anything that already dropped it counts from the start.
 	for _, src in ipairs(Ledger.ItemSources(Ledger:Lifetime(), itemID)) do
@@ -113,15 +178,19 @@ function Hunts:Add(itemID)
 		end
 	end
 	hunts[key] = hunt
+	self:Publish(hunt)
 	LibsFarmAssistant.Pricing:Remember(itemID)
 	LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_CHANGED')
 	LibsFarmAssistant:UpdateDisplay()
 	return hunt, true
 end
 
+---Stops the hunt on this character. A shared hunt also stops being added to other characters;
+---the ones that already have it keep their count.
 ---@param itemID number
 function Hunts:Remove(itemID)
 	All()[tostring(itemID)] = nil
+	Shared()[tostring(itemID)] = nil
 	LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_CHANGED')
 	LibsFarmAssistant:UpdateDisplay()
 end
@@ -129,7 +198,61 @@ end
 ---@param hunt FarmHunt
 ---@return boolean
 function Hunts:HasSources(hunt)
-	return next(hunt.sources) ~= nil
+	return next(hunt.sources) ~= nil or next(hunt.bosses or {}) ~= nil
+end
+
+---@param itemID number
+---@param shared boolean
+function Hunts:SetShared(itemID, shared)
+	local hunt = self:Get(itemID)
+	if not hunt then
+		return
+	end
+	hunt.shared = shared or nil
+	if shared then
+		self:Publish(hunt)
+	else
+		Shared()[tostring(itemID)] = nil
+	end
+	LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
+end
+
+---@param itemID number
+---@param mode string 'sources' or 'any'
+function Hunts:SetMode(itemID, mode)
+	local hunt = self:Get(itemID)
+	if hunt then
+		hunt.mode = mode
+		self:Publish(hunt)
+		LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
+	end
+end
+
+---Links a boss by name, for bosses known from a lockout rather than from a kill.
+---@param itemID number
+---@param name string
+function Hunts:AddBoss(itemID, name)
+	local hunt = self:Get(itemID)
+	if hunt and name and name ~= '' then
+		hunt.bosses = hunt.bosses or {}
+		hunt.bosses[name:lower()] = name
+		self:Publish(hunt)
+		LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
+	end
+end
+
+---@param itemID number
+---@param lower string
+function Hunts:RemoveBoss(itemID, lower)
+	local hunt = self:Get(itemID)
+	if hunt and hunt.bosses then
+		hunt.bosses[lower] = nil
+		local entry = Shared()[tostring(itemID)]
+		if entry and entry.bosses then
+			entry.bosses[lower] = nil
+		end
+		LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
+	end
 end
 
 ---@param hunt FarmHunt
@@ -145,7 +268,15 @@ function Hunts:Counts(hunt, key)
 		local prefix = key:sub(1, 1)
 		return prefix == 'c' or prefix == 'o' or prefix == 'f'
 	end
-	return hunt.sources[key] == true
+	if hunt.sources[key] then
+		return true
+	end
+	-- Bosses linked by name count whichever way the kill reports them.
+	if hunt.bosses and next(hunt.bosses) then
+		local meta = LibsFarmAssistant.global.sourceMeta[key]
+		return meta ~= nil and meta.n ~= nil and hunt.bosses[meta.n:lower()] ~= nil
+	end
+	return false
 end
 
 function Hunts:OnAttempt(_, key)
@@ -155,6 +286,7 @@ function Hunts:OnAttempt(_, key)
 	local changed = false
 	local now = GetTime()
 	local kind = key:sub(1, 1)
+	local weekKey = Ledger.WeekStartKey()
 	for id, hunt in pairs(All()) do
 		if self:Counts(hunt, key) then
 			-- A boss death arrives twice (the creature and the encounter): count it once.
@@ -163,7 +295,12 @@ function Hunts:OnAttempt(_, key)
 			if not duplicate then
 				hunt.attempts = (hunt.attempts or 0) + 1
 				hunt.totalAttempts = (hunt.totalAttempts or 0) + 1
+				if hunt.weekKey ~= weekKey then
+					hunt.weekKey, hunt.weekAttempts = weekKey, 0
+				end
+				hunt.weekAttempts = (hunt.weekAttempts or 0) + 1
 				lastAttempt[id] = { at = now, kind = kind }
+				LibsFarmAssistant.Lockouts:SaveHunt(hunt)
 				changed = true
 			end
 		end
@@ -202,6 +339,8 @@ function Hunts:OnItemGained(_, itemID, quantity, sourceKey, link, fromLoot)
 	end
 	hunt.attempts = 0
 	hunt.time = 0
+	self:Publish(hunt)
+	LibsFarmAssistant.Lockouts:SaveHunt(hunt)
 
 	self:Celebrate(hunt, drop, link)
 	LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
@@ -254,6 +393,7 @@ function Hunts:AddSource(itemID, key)
 	local hunt = self:Get(itemID)
 	if hunt and key then
 		hunt.sources[key] = true
+		self:Publish(hunt)
 		LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
 	end
 end
@@ -264,6 +404,10 @@ function Hunts:RemoveSource(itemID, key)
 	local hunt = self:Get(itemID)
 	if hunt then
 		hunt.sources[key] = nil
+		local entry = Shared()[tostring(itemID)]
+		if entry and entry.sources then
+			entry.sources[key] = nil
+		end
 		LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
 	end
 end
@@ -294,6 +438,7 @@ function Hunts:SetChance(itemID, percent)
 	else
 		hunt.chance = nil
 	end
+	self:Publish(hunt)
 	LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
 end
 
@@ -303,6 +448,7 @@ function Hunts:ResetCount(itemID)
 	if hunt then
 		hunt.attempts = 0
 		hunt.time = 0
+		LibsFarmAssistant.Lockouts:SaveHunt(hunt)
 		LibsFarmAssistant:SendMessage('LIBSFA_HUNTS_UPDATED')
 	end
 end

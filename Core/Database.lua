@@ -12,6 +12,8 @@ local defaults = {
 		-- Account-wide name caches so history stays readable offline and on other characters.
 		itemMeta = {}, -- [itemID] = { n = name, q = quality, p = sellPrice, b = bindType }
 		sourceMeta = {}, -- [sourceKey] = { n = name, k = kind, z = zone }
+		characters = {}, -- [AceDB char key] = { name, realm, class, level, scanned, lockouts, hunts }
+		sharedHunts = {}, -- [itemID string] = { sources, bosses, chance, mode } hunted on every character
 	},
 	char = {
 		dataVersion = 0,

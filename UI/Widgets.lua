@@ -787,3 +787,78 @@ function W.Table(parent, columns, opts)
 
 	return frame
 end
+
+----------------------------------------------------------------------------------------------------
+-- Menu
+----------------------------------------------------------------------------------------------------
+
+---A small pick list under a button. items: { text, detail, value }. Clicking the button again,
+---clicking elsewhere, or Escape closes it.
+---@param anchor Frame
+---@param items table[]
+---@param onPick fun(item: table)
+---@param emptyText? string
+function W.Menu(anchor, items, onPick, emptyText)
+	local menu = W.menuFrame
+	if not menu then
+		menu = CreateFrame('Frame', 'LibsFarmAssistantMenu', UIParent)
+		menu:SetFrameStrata('DIALOG')
+		menu:SetWidth(280)
+		menu:EnableMouse(true)
+		menu:SetClampedToScreen(true)
+		T.Fill(menu, { 0.06, 0.065, 0.075, 0.97 })
+		T.Border(menu, C.lineStrong, 'OVERLAY')
+		menu.list = W.List(menu, {
+			rowHeight = 20,
+			createRow = function(row)
+				row.text = T.Text(row, 11, C.text)
+				row.text:SetPoint('LEFT', 8, 0)
+				row.detail = T.Text(row, 10, C.faint)
+				row.detail:SetPoint('RIGHT', -6, 0)
+				row.detail:SetJustifyH('RIGHT')
+				row.text:SetPoint('RIGHT', row.detail, 'LEFT', -6, 0)
+			end,
+			updateRow = function(row, item)
+				row.text:SetText(item.text)
+				row.detail:SetText(item.detail or '')
+			end,
+			onClick = function(item)
+				menu:Hide()
+				if menu.onPick then
+					menu.onPick(item)
+				end
+			end,
+		})
+		menu.list:SetPoint('TOPLEFT', 2, -4)
+		menu.list:SetPoint('BOTTOMRIGHT', -2, 4)
+		menu:SetScript('OnEvent', function(self)
+			if self:IsShown() and not self:IsMouseOver() and not (self.anchor and self.anchor:IsMouseOver()) then
+				self:Hide()
+			end
+		end)
+		if not C_EventUtils or not C_EventUtils.IsEventValid or C_EventUtils.IsEventValid('GLOBAL_MOUSE_DOWN') then
+			menu:RegisterEvent('GLOBAL_MOUSE_DOWN')
+		end
+		tinsert(UISpecialFrames, 'LibsFarmAssistantMenu')
+		menu:Hide()
+		W.menuFrame = menu
+	end
+
+	if menu:IsShown() and menu.anchor == anchor then
+		menu:Hide()
+		return
+	end
+	menu.anchor = anchor
+	menu.onPick = onPick
+	menu:ClearAllPoints()
+	menu:SetPoint('TOPLEFT', anchor, 'BOTTOMLEFT', 0, -2)
+	menu:SetHeight(math.max(1, math.min(#items, 12)) * 20 + 8)
+	menu:Show()
+	menu.list:SetData(items, emptyText)
+end
+
+function W.CloseMenu()
+	if W.menuFrame then
+		W.menuFrame:Hide()
+	end
+end

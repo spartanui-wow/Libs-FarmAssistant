@@ -203,6 +203,10 @@ function W.HuntCard(parent, opts)
 				self.right:SetText(Format.Duration(hunt.time or 0))
 				self.bar:Hide()
 			end
+			local status, reset = LibsFarmAssistant.Lockouts:MyStatus(hunt)
+			if status == 'done' and reset then
+				self.right:SetText('saved ' .. Format.Duration(reset - time()))
+			end
 		end
 		T.Tint(self.bg, selected and C.selected or (self.hover and C.hover or { 0, 0, 0, 0 }))
 		self.selected = selected

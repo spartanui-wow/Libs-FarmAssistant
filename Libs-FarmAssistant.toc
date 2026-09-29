@@ -37,6 +37,7 @@ Core\MoneyTracker.lua
 Core\CurrencyTracker.lua
 Core\ReputationTracker.lua
 Core\ExperienceTracker.lua
+Core\Lockouts.lua
 Core\Hunts.lua
 Core\GoalTracker.lua
 Core\Notifications.lua

@@ -147,7 +147,8 @@ function Tracker:Lines()
 			if not hunt.paused and not LibsFarmAssistant.Hunts:IsCollected(hunt) then
 				local meta = LibsFarmAssistant.Pricing:Meta(hunt.id)
 				local r, g, b = T.QualityRGB(meta.q)
-				lines[#lines + 1] = { meta.n or ('Item ' .. hunt.id), Format.Number(hunt.attempts or 0), nil, { r, g, b } }
+				local saved = LibsFarmAssistant.Lockouts:MyStatus(hunt) == 'done'
+				lines[#lines + 1] = { meta.n or ('Item ' .. hunt.id), Format.Number(hunt.attempts or 0) .. (saved and '  saved' or ''), saved and C.muted or nil, { r, g, b } }
 			end
 		end
 	end

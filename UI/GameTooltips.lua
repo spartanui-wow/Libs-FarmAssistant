@@ -64,6 +64,16 @@ function GameTooltips:AddItemLines(tooltip, itemID)
 			text = text .. ', ' .. Format.Percent(LibsFarmAssistant.Hunts.ChanceByNow(hunt.chance, hunt.attempts or 0)) .. ' of players have it by now'
 		end
 		Line(tooltip, 'Hunting', text)
+		local Lockouts = LibsFarmAssistant.Lockouts
+		if Lockouts:HasBosses(hunt) then
+			local summary = Lockouts:Summary(hunt)
+			if summary.characters > 1 then
+				Line(tooltip, 'This week', string.format('%d of %d characters can still try', summary.open, summary.characters))
+			else
+				local status, reset = Lockouts:MyStatus(hunt)
+				Line(tooltip, 'This week', status == 'done' and ('done, resets in ' .. Format.Duration((reset or time()) - time())) or 'you can still try')
+			end
+		end
 	end
 	tooltip:Show()
 end
