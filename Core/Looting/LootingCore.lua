@@ -5,9 +5,8 @@ local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 local LootingCore = LibsFarmAssistant:NewModule('LootingCore')
 LibsFarmAssistant.LootingCore = LootingCore
 
--- Deduplication: items auto-looted in last 2 seconds are skipped by passive CHAT_MSG_LOOT tracker
-local recentlyAutoLooted = {} -- { [itemID] = GetTime() }
-local DEDUP_WINDOW = 2 -- seconds
+-- Taking a slot fires LOOT_SLOT_CLEARED, and the LootTracker records it from there with its
+-- source, so this module only decides what to take.
 
 function LootingCore:OnEnable()
 	if not LibsFarmAssistant.db.autoLoot or not LibsFarmAssistant.db.autoLoot.enabled then
@@ -25,23 +24,6 @@ function LootingCore:OnDisable()
 	self:UnregisterAllEvents()
 end
 
----Check if an item was recently auto-looted (for deduplication with passive tracker)
----@param itemID number
----@return boolean
-function LootingCore:WasRecentlyAutoLooted(itemID)
-	local timestamp = recentlyAutoLooted[itemID]
-	if not timestamp then
-		return false
-	end
-
-	if GetTime() - timestamp > DEDUP_WINDOW then
-		recentlyAutoLooted[itemID] = nil
-		return false
-	end
-
-	return true
-end
-
 ---Handle loot window opening - process all slots through module chain
 ---@param event string
 function LootingCore:OnLootWindowReady(event)
@@ -52,6 +34,11 @@ function LootingCore:OnLootWindowReady(event)
 	local numSlots = GetNumLootItems()
 	if numSlots == 0 then
 		return
+	end
+
+	-- Read every slot with its source before anything is taken.
+	if LibsFarmAssistant.LootTracker then
+		LibsFarmAssistant.LootTracker:Snapshot()
 	end
 
 	local modules = LibsFarmAssistant:GetSortedLootingModules()
@@ -95,11 +82,11 @@ function LootingCore:BuildSlotData(slotIndex)
 	local sellPrice = nil
 	local bindType = nil
 
-	if slotType == Enum.LootSlotType.Item then
+	if slotType == ((Enum and Enum.LootSlotType and Enum.LootSlotType.Item) or LOOT_SLOT_ITEM or 1) then
 		itemLink = GetLootSlotLink(slotIndex)
 		if itemLink then
 			itemID = tonumber(itemLink:match('item:(%d+)'))
-			local _, _, _, _, _, _, _, _, _, _, itemSellPrice, _, _, bindTypeVal = C_Item.GetItemInfo(itemLink)
+			local _, _, _, itemSellPrice, bindTypeVal = LibsFarmAssistant.Compat.ItemInfo(itemLink)
 			sellPrice = itemSellPrice
 			bindType = bindTypeVal
 		end
@@ -137,19 +124,6 @@ function LootingCore:ProcessSlot(slotData, modules)
 		if result then
 			if result.loot then
 				LootSlot(slotData.slotIndex)
-
-				if slotData.slotType == Enum.LootSlotType.Item and slotData.itemID then
-					recentlyAutoLooted[slotData.itemID] = GetTime()
-					LibsFarmAssistant:RecordItem(
-						slotData.itemID,
-						slotData.itemName,
-						slotData.itemLink or slotData.itemName,
-						slotData.icon,
-						slotData.quality,
-						slotData.quantity,
-						slotData.sellPrice or 0
-					)
-				end
 
 				self:PrintLooted(slotData, result.reason or module.name)
 				return true, result.reason or module.name
@@ -205,24 +179,7 @@ function LootingCore:PrintIgnored(slotData, reason)
 	LibsFarmAssistant:Print(msg)
 end
 
----Cleanup stale dedup entries (called periodically)
-function LootingCore:CleanupDedupCache()
-	local now = GetTime()
-	for itemID, timestamp in pairs(recentlyAutoLooted) do
-		if now - timestamp > DEDUP_WINDOW then
-			recentlyAutoLooted[itemID] = nil
-		end
-	end
-end
-
 -- Bridge methods
-function LibsFarmAssistant:WasRecentlyAutoLooted(itemID)
-	if self.LootingCore then
-		return self.LootingCore:WasRecentlyAutoLooted(itemID)
-	end
-	return false
-end
-
 function LibsFarmAssistant:OnLootWindowReady(event)
 	if self.LootingCore then
 		self.LootingCore:OnLootWindowReady(event)
@@ -243,8 +200,3 @@ function LibsFarmAssistant:ProcessSlot(slotData, modules)
 	return nil, nil
 end
 
-function LibsFarmAssistant:CleanupDedupCache()
-	if self.LootingCore then
-		self.LootingCore:CleanupDedupCache()
-	end
-end

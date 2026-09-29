@@ -5,86 +5,118 @@ local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 local Database = LibsFarmAssistant:NewModule('Database')
 LibsFarmAssistant.Database = Database
 
+local DATA_VERSION = 2
+
 local defaults = {
+	global = {
+		-- Account-wide name caches so history stays readable offline and on other characters.
+		itemMeta = {}, -- [itemID] = { n = name, q = quality, p = sellPrice, b = bindType }
+		sourceMeta = {}, -- [sourceKey] = { n = name, k = kind, z = zone }
+	},
 	char = {
-		session = {
-			active = true,
-			startTime = 0, -- GetTime() value
-			pausedDuration = 0, -- Accumulated paused seconds
-			items = {}, -- [itemID] = { name, link, icon, quality, count, sellPrice }
-			watchedItems = {}, -- [itemID] = { itemID, name, link, icon, quality }
-			money = 0, -- Copper gained (delta tracking)
-			currencies = {}, -- [currencyName] = { name, icon, count }
-			reputation = {}, -- [factionName] = gained
-			honor = 0, -- Total honor gained
-		},
-		history = {}, -- Array of session snapshots, newest first
-		bestRates = {
-			itemsPerHour = 0,
-			goldPerHour = 0,
-			honorPerHour = 0,
-		},
+		dataVersion = 0,
+		session = nil, -- Ledger bucket plus session fields, created by SessionManager
+		days = {}, -- ['2026-09-28'] = bucket
+		months = {}, -- ['2026-09'] = bucket
+		lifetime = nil, -- bucket
+		sessions = {}, -- archived session summaries, newest first
+		hunts = {}, -- [itemID string] = hunt
+		watchedItems = {}, -- [itemID string] = { itemID, name, link, icon, quality }
+		factionTotals = {}, -- [factionID] = last seen monotonic total
 	},
 	profile = {
-		qualityFilter = 0, -- Minimum quality to track (0=Poor, 1=Common, etc.)
-		autoLoot = {
-			enabled = true, -- Master toggle for auto-looting
-			fastLoot = true, -- Use LOOT_READY (true) vs LOOT_OPENED (false)
-			closeLoot = false, -- Close loot window after auto-looting
-			lootAll = false, -- Loot everything (overrides all filters)
-			printLooted = false, -- Chat output for looted items
-			printIgnored = false, -- Chat output for ignored items
-			printReason = true, -- Show reason in chat output
-		},
-		lootModules = {
-			whitelist = {}, -- { [itemID_string] = itemName }
-			blacklist = {}, -- { [itemID_string] = itemName }
-			alertList = {}, -- { [itemID_string] = itemName }
-			alertSound = SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959,
-			lootQuest = true, -- Auto-loot quest items
-			lootTokens = true, -- Loot items with no vendor price
-			ignoreBOP = false, -- Skip Bind on Pickup items
-			fishingMode = true, -- Loot everything while fishing
-			minPrice = 0, -- Minimum vendor price in copper (0 = disabled)
-			rarityTable = { -- Per-quality tier toggles
-				[0] = false, -- Poor (grey)
-				[1] = false, -- Common (white)
-				[2] = true, -- Uncommon (green)
-				[3] = true, -- Rare (blue)
-				[4] = true, -- Epic (purple)
-				[5] = true, -- Legendary (orange)
-			},
-		},
 		tracking = {
 			loot = true,
 			money = true,
 			currency = true,
 			reputation = true,
+			experience = true,
 			honor = true,
-			itemValue = true,
+			kills = true,
+			mode = 'all', -- 'all' = every item in the chosen qualities, 'selected' = watched and hunted items only
+			qualities = { [0] = true, [1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true, [7] = true },
+			countCrafted = false,
+			countQuestRewards = true,
 		},
-		goals = {}, -- Array of goal definitions
-		goalSound = true, -- Play sound on goal completion
+		pricing = {
+			source = 'best', -- 'vendor', 'auction', 'best'
+		},
+		session = {
+			newAfterMinutes = 30,
+			pauseWhenAFK = true,
+		},
+		autoLoot = {
+			enabled = true,
+			fastLoot = true,
+			closeLoot = false,
+			lootAll = false,
+			printLooted = false,
+			printIgnored = false,
+			printReason = true,
+		},
+		lootModules = {
+			whitelist = {},
+			blacklist = {},
+			alertList = {},
+			alertSound = SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959,
+			lootQuest = true,
+			lootTokens = true,
+			ignoreBOP = false,
+			fishingMode = true,
+			minPrice = 0,
+			rarityTable = {
+				[0] = false,
+				[1] = false,
+				[2] = true,
+				[3] = true,
+				[4] = true,
+				[5] = true,
+			},
+		},
+		hunts = {
+			sound = true,
+			announce = true,
+		},
+		goals = {},
+		goalSound = true,
 		sessionNotifications = {
 			enabled = false,
 			frequencyMinutes = 15,
 		},
 		display = {
-			format = 'items', -- 'items', 'money', 'combined'
+			format = 'value', -- broker text: 'value', 'gold', 'items', 'kills', 'hunt'
 		},
-		chatEcho = false, -- Echo loot/money/currency/rep/honor to chat
+		tooltips = {
+			items = true,
+			units = true,
+		},
+		chatEcho = false,
 		smartSession = {
 			enabled = false,
 			autoStart = false,
 			lootThreshold = 3,
 			timeWindowSeconds = 30,
 		},
-		popup = {
+		window = {
 			point = 'CENTER',
+			relativePoint = 'CENTER',
 			x = 0,
 			y = 0,
-			width = 420,
-			height = 350,
+			width = 780,
+			height = 500,
+			scale = 1,
+			page = 'overview',
+			range = 'session',
+		},
+		tracker = {
+			shown = false,
+			locked = false,
+			point = 'RIGHT',
+			relativePoint = 'RIGHT',
+			x = -180,
+			y = 120,
+			scale = 1,
+			lines = { value = true, gold = false, kills = true, xp = true, hunts = true, rep = true },
 		},
 		minimap = {
 			hide = false,
@@ -93,14 +125,52 @@ local defaults = {
 }
 
 function Database:OnInitialize()
-	LibsFarmAssistant.dbobj = LibStub('AceDB-3.0'):New('LibsFarmAssistantDB', defaults, true)
-	LibsFarmAssistant.db = LibsFarmAssistant.dbobj.profile
-	LibsFarmAssistant.session = LibsFarmAssistant.dbobj.char.session
+	local dbobj = LibStub('AceDB-3.0'):New('LibsFarmAssistantDB', defaults, true)
+	LibsFarmAssistant.dbobj = dbobj
+	LibsFarmAssistant.db = dbobj.profile
+	LibsFarmAssistant.global = dbobj.global
+	LibsFarmAssistant.char = dbobj.char
 
-	-- Profile callbacks
-	LibsFarmAssistant.dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileChanged', 'OnProfileChanged')
-	LibsFarmAssistant.dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileCopied', 'OnProfileChanged')
-	LibsFarmAssistant.dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileReset', 'OnProfileChanged')
+	self:Migrate()
+
+	dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileChanged', 'OnProfileChanged')
+	dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileCopied', 'OnProfileChanged')
+	dbobj.RegisterCallback(LibsFarmAssistant, 'OnProfileReset', 'OnProfileChanged')
+end
+
+-- Version 1 stored one flat session and short history; carry the watched items and goals
+-- forward and let the ledger start clean.
+function Database:Migrate()
+	local char = LibsFarmAssistant.char
+	if (char.dataVersion or 0) >= DATA_VERSION then
+		return
+	end
+
+	local old = char.session
+	if old and old.items and not old.version then
+		if old.watchedItems then
+			for key, info in pairs(old.watchedItems) do
+				char.watchedItems[key] = info
+			end
+		end
+		char.session = nil
+	end
+	char.history = nil
+	char.bestRates = nil
+
+	local profile = LibsFarmAssistant.db
+	if profile.qualityFilter then
+		for q = 0, 7 do
+			profile.tracking.qualities[q] = q >= profile.qualityFilter
+		end
+		profile.qualityFilter = nil
+	end
+	profile.popup = nil
+	if profile.display and (profile.display.format == 'money' or profile.display.format == 'combined') then
+		profile.display.format = 'value'
+	end
+
+	char.dataVersion = DATA_VERSION
 end
 
 function LibsFarmAssistant:OnProfileChanged()
@@ -108,5 +178,6 @@ function LibsFarmAssistant:OnProfileChanged()
 	if self.InvalidateLootingModuleCache then
 		self:InvalidateLootingModuleCache()
 	end
+	self:SendMessage('LIBSFA_SETTINGS_CHANGED')
 	self:UpdateDisplay()
 end

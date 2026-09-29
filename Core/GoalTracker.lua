@@ -1,197 +1,162 @@
 ---@class LibsFarmAssistant
 local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 
+-- Session goals: "200 Runecloth", "500 gold", "3,000 honor". Progress is read from the current
+-- session, with an estimate of the time left at the current pace.
+
 ---@class LibsFarmAssistant.GoalTracker : AceModule, AceEvent-3.0, AceTimer-3.0
 local GoalTracker = LibsFarmAssistant:NewModule('GoalTracker')
 LibsFarmAssistant.GoalTracker = GoalTracker
 
--- Runtime tracking of which goals completed this session (not saved)
-local completedGoals = {}
+local Compat = LibsFarmAssistant.Compat
+local Ledger = LibsFarmAssistant.Ledger
+local Format = LibsFarmAssistant.Format
+
+local completed = setmetatable({}, { __mode = 'k' }) -- goal -> true once announced this session
 
 function GoalTracker:OnEnable()
-	-- Ensure goals table exists (backward compat)
-	if not LibsFarmAssistant.db.goals then
-		LibsFarmAssistant.db.goals = {}
-	end
-	if LibsFarmAssistant.db.goalSound == nil then
-		LibsFarmAssistant.db.goalSound = true
-	end
-
-	-- Pre-check which goals are already completed (handles /rl)
-	for i, goal in ipairs(LibsFarmAssistant.db.goals) do
+	for _, goal in ipairs(LibsFarmAssistant.db.goals) do
 		if goal.active then
-			local current, target = self:GetGoalProgress(goal)
+			local current, target = self:Progress(goal)
 			if target > 0 and current >= target then
-				completedGoals[i] = true
+				completed[goal] = true
 			end
 		end
 	end
 end
 
----Get current progress for a goal
 ---@param goal table
----@return number current
----@return number target
----@return number progress 0-1
-function GoalTracker:GetGoalProgress(goal)
-	local current = 0
-	local target = goal.targetValue or 0
-
-	if goal.type == 'item' then
-		local key = tostring(goal.targetItemID)
-		local item = LibsFarmAssistant.session.items[key]
-		current = item and item.count or 0
-	elseif goal.type == 'money' then
-		current = LibsFarmAssistant.session.money
-	elseif goal.type == 'honor' then
-		current = LibsFarmAssistant.session.honor or 0
-	elseif goal.type == 'currency' then
-		local data = LibsFarmAssistant.session.currencies[goal.targetName or '']
-		current = data and data.count or 0
-	elseif goal.type == 'reputation' then
-		current = LibsFarmAssistant.session.reputation[goal.targetName or ''] or 0
+---@return number|nil
+local function CurrencyID(goal)
+	if goal.currencyID then
+		return goal.currencyID
 	end
-
-	local progress = target > 0 and math.min(current / target, 1) or 0
-	return current, target, progress
-end
-
----Calculate estimated time remaining for a goal
----@param goal table
----@return string|nil eta Formatted time string or nil
-function GoalTracker:GetGoalETA(goal)
-	local current, target, progress = self:GetGoalProgress(goal)
-	if progress >= 1 then
-		return nil
-	end
-
-	local hours = LibsFarmAssistant:GetSessionHours()
-	if hours <= 0 or current <= 0 then
-		return nil
-	end
-
-	local rate = current / hours
-	local remaining = target - current
-	local remainingHours = remaining / rate
-	local remainingSeconds = remainingHours * 3600
-
-	return LibsFarmAssistant:FormatDuration(remainingSeconds)
-end
-
----Build a text progress bar
----@param progress number 0-1
----@param width number Number of bar characters
----@return string
-function GoalTracker:BuildProgressBar(progress, width)
-	local filled = math.floor(progress * width + 0.5)
-	local empty = width - filled
-	-- Use || for literal pipe in WoW escape sequences
-	return '|cff00ff00' .. string.rep('||', filled) .. '|r|cff404040' .. string.rep('||', empty) .. '|r'
-end
-
----Check all active goals for completion
----Called from UpdateDisplay()
-function GoalTracker:CheckGoalCompletion()
-	if not LibsFarmAssistant.db.goals then
-		return
-	end
-
-	for i, goal in ipairs(LibsFarmAssistant.db.goals) do
-		if goal.active and not completedGoals[i] then
-			local current, target = self:GetGoalProgress(goal)
-			if target > 0 and current >= target then
-				completedGoals[i] = true
-
-				-- Notification
-				local goalName = goal.targetName or goal.type
-				if goal.type == 'item' then
-					local item = LibsFarmAssistant.session.items[tostring(goal.targetItemID)]
-					goalName = (item and item.link) or (item and item.name) or goalName
-				elseif goal.type == 'money' then
-					goalName = LibsFarmAssistant:FormatMoney(goal.targetValue)
-				end
-
-				LibsFarmAssistant:Print(string.format('|cff00ff00Goal Complete!|r %s reached %s', goalName, LibsFarmAssistant:FormatNumber(target)))
-
-				-- Play sound
-				if LibsFarmAssistant.db.goalSound then
-					PlaySound(888) -- SOUNDKIT.READY_CHECK
-				end
+	if goal.targetName then
+		for currencyID in pairs(Ledger:Session().currencies) do
+			if Compat.CurrencyInfo(currencyID) == goal.targetName then
+				goal.currencyID = currencyID
+				return currencyID
 			end
 		end
-	end
-end
-
----Reset goal completion tracking for a new session
-function GoalTracker:ResetGoalCompletion()
-	wipe(completedGoals)
-end
-
----Format a goal's current value for display
----@param goal table
----@param current number
----@return string
-function GoalTracker:FormatGoalValue(goal, current)
-	if goal.type == 'money' then
-		return LibsFarmAssistant:FormatMoney(current)
-	end
-	return LibsFarmAssistant:FormatNumber(current)
-end
-
----Format a goal's target value for display
----@param goal table
----@return string
-function GoalTracker:FormatGoalTarget(goal)
-	if goal.type == 'money' then
-		return LibsFarmAssistant:FormatMoney(goal.targetValue)
-	end
-	return LibsFarmAssistant:FormatNumber(goal.targetValue)
-end
-
--- Bridge methods
-function LibsFarmAssistant:GetGoalProgress(goal)
-	if self.GoalTracker then
-		return self.GoalTracker:GetGoalProgress(goal)
-	end
-	return 0, 0, 0
-end
-
-function LibsFarmAssistant:GetGoalETA(goal)
-	if self.GoalTracker then
-		return self.GoalTracker:GetGoalETA(goal)
 	end
 	return nil
 end
 
-function LibsFarmAssistant:BuildProgressBar(progress, width)
-	if self.GoalTracker then
-		return self.GoalTracker:BuildProgressBar(progress, width)
+---@param goal table
+---@return number|nil
+local function FactionID(goal)
+	if goal.factionID then
+		return goal.factionID
 	end
-	return ''
+	local tracker = LibsFarmAssistant.ReputationTracker
+	if goal.targetName and tracker then
+		goal.factionID = tracker:IDForName(goal.targetName)
+	end
+	return goal.factionID
 end
 
-function LibsFarmAssistant:CheckGoalCompletion()
-	if self.GoalTracker then
-		self.GoalTracker:CheckGoalCompletion()
+---@param goal table
+---@return number current, number target, number progress 0-1
+function GoalTracker:Progress(goal)
+	local session = Ledger:Session()
+	local current = 0
+	if goal.type == 'item' then
+		current = session.items[goal.targetItemID] or 0
+	elseif goal.type == 'money' then
+		current = Ledger.Money(session)
+	elseif goal.type == 'value' then
+		current = Ledger.TotalValue(session)
+	elseif goal.type == 'honor' then
+		current = session.honor or 0
+	elseif goal.type == 'kills' then
+		current = session.kills or 0
+	elseif goal.type == 'xp' then
+		current = session.xp or 0
+	elseif goal.type == 'currency' then
+		local id = CurrencyID(goal)
+		current = id and session.currencies[id] or 0
+	elseif goal.type == 'reputation' then
+		local id = FactionID(goal)
+		current = id and session.rep[id] or 0
 	end
+	local target = goal.targetValue or 0
+	return current, target, target > 0 and math.min(current / target, 1) or 0
+end
+
+---@param goal table
+---@return number|nil seconds left at the session's pace
+function GoalTracker:ETA(goal)
+	local current, target, progress = self:Progress(goal)
+	if progress >= 1 or current <= 0 then
+		return nil
+	end
+	local perHour = Ledger.PerHour(current, Ledger:Session())
+	if not perHour or perHour <= 0 then
+		return nil
+	end
+	return (target - current) / perHour * 3600
+end
+
+---@param goal table
+---@return string
+function GoalTracker:Name(goal)
+	if goal.type == 'item' then
+		local meta = LibsFarmAssistant.Pricing:Meta(goal.targetItemID)
+		return meta.n or goal.targetName or ('Item ' .. tostring(goal.targetItemID))
+	elseif goal.type == 'money' then
+		return 'Gold'
+	elseif goal.type == 'value' then
+		return 'Total value'
+	elseif goal.type == 'honor' then
+		return 'Honor'
+	elseif goal.type == 'kills' then
+		return 'Kills'
+	elseif goal.type == 'xp' then
+		return 'Experience'
+	elseif goal.type == 'currency' then
+		local id = CurrencyID(goal)
+		return (id and Compat.CurrencyInfo(id)) or goal.targetName or 'Currency'
+	elseif goal.type == 'reputation' then
+		local id = FactionID(goal)
+		return (id and Compat.FactionName(id)) or goal.targetName or 'Reputation'
+	end
+	return goal.targetName or goal.type
+end
+
+---@param goal table
+---@param value number
+---@return string
+function GoalTracker:FormatValue(goal, value)
+	if goal.type == 'money' or goal.type == 'value' then
+		return Format.Money(value)
+	end
+	return Format.Number(value)
+end
+
+function GoalTracker:CheckCompletion()
+	for _, goal in ipairs(LibsFarmAssistant.db.goals) do
+		if goal.active and not completed[goal] then
+			local current, target = self:Progress(goal)
+			if target > 0 and current >= target then
+				completed[goal] = true
+				LibsFarmAssistant:Print(string.format('Goal reached: %s %s.', self:FormatValue(goal, target), self:Name(goal)))
+				if LibsFarmAssistant.db.goalSound then
+					PlaySound(SOUNDKIT and SOUNDKIT.READY_CHECK or 8960)
+				end
+			end
+		end
+	end
+end
+
+function GoalTracker:ResetCompletion()
+	wipe(completed)
+end
+
+-- Bridges
+function LibsFarmAssistant:CheckGoalCompletion()
+	self.GoalTracker:CheckCompletion()
 end
 
 function LibsFarmAssistant:ResetGoalCompletion()
-	if self.GoalTracker then
-		self.GoalTracker:ResetGoalCompletion()
-	end
-end
-
-function LibsFarmAssistant:FormatGoalValue(goal, current)
-	if self.GoalTracker then
-		return self.GoalTracker:FormatGoalValue(goal, current)
-	end
-	return '0'
-end
-
-function LibsFarmAssistant:FormatGoalTarget(goal)
-	if self.GoalTracker then
-		return self.GoalTracker:FormatGoalTarget(goal)
-	end
-	return '0'
+	self.GoalTracker:ResetCompletion()
 end

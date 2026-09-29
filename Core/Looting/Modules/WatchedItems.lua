@@ -4,7 +4,7 @@ local LibsFarmAssistant = LibStub('AceAddon-3.0'):GetAddon('Libs-FarmAssistant')
 local module = LibsFarmAssistant:NewLootingModule('WatchedItems', 150)
 
 function module:IsEnabled()
-	local watched = LibsFarmAssistant.session and LibsFarmAssistant.session.watchedItems
+	local watched = LibsFarmAssistant.char and LibsFarmAssistant.char.watchedItems
 	if not watched then
 		return false
 	end
@@ -23,7 +23,7 @@ function module:CanLoot(slotData)
 		return nil
 	end
 
-	local watched = LibsFarmAssistant.session.watchedItems
+	local watched = LibsFarmAssistant.char.watchedItems
 	if watched[itemKey] then
 		return { loot = true, reason = 'Watched' }
 	end
