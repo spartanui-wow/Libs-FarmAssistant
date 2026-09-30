@@ -128,8 +128,12 @@ function Page:Refresh(bucket, range)
 		end
 		local seconds, kills = LibsFarmAssistant.ExperienceTracker:TimeToLevel(bucket)
 		rows[#rows + 1] = { label = 'Next level in', value = seconds and Format.Duration(seconds) or '-' }
+		local perKill, _, sampled = LibsFarmAssistant.ExperienceTracker:PerKill()
+		if perKill then
+			rows[#rows + 1] = { label = 'Per kill at level ' .. status.level, value = Format.Number(math.floor(perKill + 0.5)) .. '  (' .. Format.Number(sampled) .. ' kills)' }
+		end
 		if kills then
-			rows[#rows + 1] = { label = 'At this pace', value = 'about ' .. Format.Number(kills) .. ' kills' }
+			rows[#rows + 1] = { label = 'Kills to level', value = 'about ' .. Format.Number(kills) }
 		end
 	else
 		self.xpHeading.title:SetText('Experience')

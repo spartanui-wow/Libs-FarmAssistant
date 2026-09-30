@@ -476,7 +476,7 @@ function UnitXPMax()
 	return H.state.xpMax
 end
 function GetXPExhaustion()
-	return 0
+	return H.state.rested
 end
 function IsXPUserDisabled()
 	return false

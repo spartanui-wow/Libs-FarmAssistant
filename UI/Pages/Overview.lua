@@ -347,7 +347,14 @@ function Page:Refresh(bucket, range)
 		self.xpLeft:SetText(Format.Percent(xp.current / xp.max) .. restedText)
 		self.xpRight:ClearAllPoints()
 		self.xpRight:SetPoint('TOPRIGHT', self.xpBar, 'BOTTOMRIGHT', 0, -4)
-		local seconds = LibsFarmAssistant.ExperienceTracker:TimeToLevel(bucket)
-		self.xpRight:SetText(seconds and (Format.Duration(seconds) .. ' to level ' .. (xp.level + 1)) or '')
+		local seconds, kills = LibsFarmAssistant.ExperienceTracker:TimeToLevel(bucket)
+		local parts = {}
+		if kills then
+			parts[#parts + 1] = Format.Number(kills) .. (kills == 1 and ' kill' or ' kills')
+		end
+		if seconds then
+			parts[#parts + 1] = Format.Duration(seconds)
+		end
+		self.xpRight:SetText(#parts > 0 and (table.concat(parts, ', ') .. ' to level ' .. (xp.level + 1)) or '')
 	end
 end

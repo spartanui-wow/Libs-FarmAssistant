@@ -102,6 +102,10 @@ function GameTooltips:AddUnitLines(tooltip, guid)
 		killed = killed .. ', ' .. Format.Number(stats.loots) .. ' looted'
 	end
 	Line(tooltip, 'Farmed', killed)
+	local xpEach = LibsFarmAssistant.ExperienceTracker:SourcePerKill(key)
+	if xpEach and LibsFarmAssistant.Compat.CanGainXP() then
+		Line(tooltip, 'Experience', Format.Number(math.floor(xpEach + 0.5)) .. ' per kill')
+	end
 
 	local drops = {}
 	for itemID, count in pairs(stats.drops) do

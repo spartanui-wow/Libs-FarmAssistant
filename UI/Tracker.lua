@@ -139,8 +139,12 @@ function Tracker:Lines()
 		lines[#lines + 1] = { 'Kills', Format.Number(bucket.kills) .. (rate and ('  ' .. Format.Rate(rate) .. ' /hr') or '') }
 	end
 	if s.xp and bucket.xp > 0 and LibsFarmAssistant.Compat.CanGainXP() then
-		local seconds = LibsFarmAssistant.ExperienceTracker:TimeToLevel(bucket)
-		lines[#lines + 1] = { 'Level ' .. UnitLevel('player'), seconds and (Format.Duration(seconds) .. ' to go') or ('+' .. Format.Short(bucket.xp)) }
+		local seconds, kills = LibsFarmAssistant.ExperienceTracker:TimeToLevel(bucket)
+		local value = seconds and (Format.Duration(seconds) .. ' to go') or ('+' .. Format.Short(bucket.xp))
+		if kills then
+			value = Format.Number(kills) .. (kills == 1 and ' kill' or ' kills') .. (seconds and ('  ' .. Format.Duration(seconds)) or '')
+		end
+		lines[#lines + 1] = { 'Level ' .. UnitLevel('player'), value }
 	end
 	if s.hunts then
 		for _, hunt in ipairs(LibsFarmAssistant.Hunts:List()) do

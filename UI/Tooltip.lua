@@ -49,8 +49,12 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 		Line(tooltip, 'Kills', Format.Number(bucket.kills) .. (killRate and ('   ' .. Format.Rate(killRate) .. ' /hr') or ''))
 	end
 	if bucket.xp > 0 then
-		local seconds = self.ExperienceTracker:TimeToLevel(bucket)
+		local seconds, kills = self.ExperienceTracker:TimeToLevel(bucket)
 		Line(tooltip, 'Experience', Format.Short(bucket.xp) .. (seconds and ('   level in ' .. Format.Duration(seconds)) or ''))
+		local perKill = self.ExperienceTracker:PerKill()
+		if perKill then
+			Line(tooltip, 'Per kill', Format.Number(math.floor(perKill + 0.5)) .. (kills and ('   ' .. Format.Number(kills) .. ' kills to level') or ''))
+		end
 	end
 	if bucket.honor > 0 then
 		Line(tooltip, 'Honor', Format.Number(bucket.honor))

@@ -211,6 +211,83 @@ H.test('experience across a level-up', function()
 	H.eq(Ledger:Session().xp, before + 15000, 'overflow into next level counted')
 end)
 
+H.test('experience per kill at the current level', function()
+	local XP = LibsFarmAssistant.ExperienceTracker
+	H.state.level, H.state.xp, H.state.xpMax, H.state.rested = 72, 0, 100000, nil
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:PerKill(), nil, 'no average before a kill')
+
+	-- Kill first, experience after.
+	H.kill(3100, 'Boar', 1)
+	H.state.xp = 400
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:PerKill(), 400, 'one kill paired')
+	H.eq(XP:SourcePerKill('c:3100'), 400, 'per mob average')
+
+	-- Experience first, kill after.
+	H.state.xp = 1000
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.kill(3101, 'Wolf', 2)
+	H.advance(2)
+	H.eq(XP:SourcePerKill('c:3101'), 600, 'order does not matter')
+	H.eq(select(3, XP:PerKill()), 2, 'two kills sampled')
+
+	-- Three kills sharing one bar update.
+	H.kill(3100, 'Boar', 3)
+	H.kill(3100, 'Boar', 4)
+	H.kill(3100, 'Boar', 5)
+	H.state.xp = 2200
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:SourcePerKill('c:3100'), 400, 'shared update split across kills')
+
+	-- Quest experience is not kill experience.
+	H.fire('QUEST_TURNED_IN', 123, 5000, 0)
+	H.state.xp = 7200
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(select(3, XP:PerKill()), 5, 'quest adds no kill')
+	H.kill(3100, 'Boar', 6)
+	H.fire('QUEST_TURNED_IN', 124, 1000, 0)
+	H.state.xp = 8600
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:SourcePerKill('c:3100'), 400, 'quest in the same moment is taken out')
+
+	-- 2600 from 6 kills, 91400 to go, no rest: 211 kills.
+	H.eq(XP:KillsToLevel(), 211, 'kills to level')
+	-- With 10000 rested the first kills are doubled: (91400 - 10000) / (2600 / 6) = 188.
+	H.state.rested = 10000
+	H.eq(XP:KillsToLevel(), 188, 'rested spent first')
+
+	-- A rested kill: 800 earned, 400 of it from the pool.
+	H.fire('UPDATE_EXHAUSTION')
+	H.kill(3102, 'Bear', 7)
+	H.state.xp = 9400
+	H.state.rested = 9600
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:SourcePerKill('c:3102'), 800, 'earned amount shown')
+	H.eq(XP:LevelRecord().rested, 400, 'rested bonus kept out of the base')
+	H.state.rested = nil
+
+	-- Level up: the record starts over.
+	H.state.level = 73
+	H.fire('PLAYER_LEVEL_UP', 73)
+	H.state.xp = 100
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:PerKill(), nil, 'new level, no average yet')
+	H.eq(XP:SourcePerKill('c:3100'), nil, 'per mob averages start over')
+	H.kill(3100, 'Boar', 8)
+	H.state.xp = 450
+	H.fire('PLAYER_XP_UPDATE', 'player')
+	H.advance(2)
+	H.eq(XP:SourcePerKill('c:3100'), 350, 'new level average')
+end)
+
 H.test('currency', function()
 	H.state.currencies[1166].quantity = 105
 	H.fire('CURRENCY_DISPLAY_UPDATE', 1166, 105, 5)

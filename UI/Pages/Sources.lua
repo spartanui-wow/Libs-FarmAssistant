@@ -268,6 +268,10 @@ function Page:RefreshDetail(bucket)
 	if (stats.money or 0) > 0 then
 		parts[#parts + 1] = Format.Money(stats.money) .. ' coin'
 	end
+	local xpEach = kind == 'creature' and LibsFarmAssistant.ExperienceTracker:SourcePerKill(key)
+	if xpEach then
+		parts[#parts + 1] = Format.Number(math.floor(xpEach + 0.5)) .. ' xp each'
+	end
 	self.sub:SetText(table.concat(parts, '   '))
 
 	local value = SourceValue(key, stats)

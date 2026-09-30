@@ -32,7 +32,9 @@ Core/
   MoneyTracker.lua            GetMoney() deltas, categorized by which window is open
   CurrencyTracker.lua         CURRENCY_DISPLAY_UPDATE; honor (currency on Mists+, chat on older)
   ReputationTracker.lua       Monotonic faction totals diffed; chat as a hint; Gains(bucket) for UI
-  ExperienceTracker.lua       UnitXP deltas across level-ups; time/kills to level
+  ExperienceTracker.lua       UnitXP deltas across level-ups; time to level; experience per kill
+                              for the current level only (char.levelXP, reset on level-up) and
+                              kills to level with the rested pool spent first
   Lockouts.lua                Raid, dungeon and world boss saves per character (account-wide),
                               boss matching by name, per-character hunt counts, weekly summaries
   Hunts.lua                   Attempt counting, drop history, sources, bosses, luck math, shared hunts
@@ -92,6 +94,10 @@ Every bucket (session, `char.days[YYYY-MM-DD]`, `char.months[YYYY-MM]`, `char.li
 - The auto-looter calls `LootTracker:Snapshot()` before `LootSlot()`; it never records items itself.
 - Money: an open loot/merchant/mail/quest window outranks one that closed a moment ago.
 - Everything checks `IsSessionActive()`; pausing stops the clock and the counting.
+- Experience per kill: kills (`LIBSFA_ATTEMPT` with a `c:` key), bar gains and `QUEST_TURNED_IN`
+  rewards are gathered into a burst that closes after 1s of quiet (6s at most). The burst's
+  experience minus quest rewards is split over max(kills, bar gains - quests); the rested bonus is
+  the drop in `GetXPExhaustion()` across the burst. A burst that spans a level-up is not recorded.
 
 ## Lockouts
 
@@ -135,7 +141,8 @@ In game, check:
 3. Group loot on an epic: counted only for the winner.
 4. Sell to a vendor: "Sold to vendors" rises, looted gold does not.
 5. Gain rep (normal, renown, paragon, friendship): Progress bars, pace, and no double counts.
-6. Level up mid-session: XP keeps counting across the level.
+6. Level up mid-session: XP keeps counting across the level. Kill a few mobs: Progress shows
+   experience per kill and kills to level; after the level-up both start over.
 7. Add a hunt (Shift-click into the Hunts box), kill mobs, set a drop chance: luck bar and text.
 8. Log out for over 30 minutes: a new session starts, the old one is in History.
 9. /reload: everything persists; the window reopens on the same page and range.

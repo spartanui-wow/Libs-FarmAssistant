@@ -25,6 +25,7 @@ local defaults = {
 		hunts = {}, -- [itemID string] = hunt
 		watchedItems = {}, -- [itemID string] = { itemID, name, link, icon, quality }
 		factionTotals = {}, -- [factionID] = last seen monotonic total
+		levelXP = nil, -- experience per kill at the current level, started over on level-up
 	},
 	profile = {
 		tracking = {

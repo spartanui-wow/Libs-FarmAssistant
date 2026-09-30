@@ -208,7 +208,8 @@ function SessionManager:PrintSummary()
 		LibsFarmAssistant:Print(string.format('  Kills: %s', Format.Number(session.kills)))
 	end
 	if session.xp > 0 then
-		LibsFarmAssistant:Print(string.format('  Experience: %s', Format.Number(session.xp)))
+		local perKill = LibsFarmAssistant.ExperienceTracker:PerKill()
+		LibsFarmAssistant:Print(string.format('  Experience: %s%s', Format.Number(session.xp), perKill and (' (' .. Format.Number(math.floor(perKill + 0.5)) .. ' per kill at this level)') or ''))
 	end
 	local rep = Ledger.RepTotal(session)
 	if rep > 0 then
