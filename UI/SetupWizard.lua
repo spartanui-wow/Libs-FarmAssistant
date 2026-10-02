@@ -16,7 +16,9 @@ end
 ---@return boolean
 local function GetExtra(key)
 	local db = LibsFarmAssistant.db
-	if key == 'skipPoor' then
+	if key == 'huntedOnly' then
+		return db.tracking.mode == 'selected'
+	elseif key == 'skipPoor' then
 		return db.tracking.qualities[0] == false
 	elseif key == 'tooltips' then
 		return (db.tooltips.items and db.tooltips.units) and true or false
@@ -32,7 +34,10 @@ end
 local function SetExtra(key, value)
 	local db = LibsFarmAssistant.db
 	value = value and true or false
-	if key == 'skipPoor' then
+	if key == 'huntedOnly' then
+		db.tracking.mode = value and 'selected' or 'all'
+		Changed()
+	elseif key == 'skipPoor' then
 		db.tracking.qualities[0] = not value
 		Changed()
 	elseif key == 'tooltips' then
@@ -74,33 +79,14 @@ function LibsFarmAssistant:RegisterSetup()
 	self.setupRegistration = reg
 
 	reg:AddStep({
-		id = 'counting',
-		kind = 'choice',
-		name = 'What to count',
-		title = 'Which items should it count?',
-		text = 'Gold, kills and reputation are counted either way.',
-		order = 10,
-		choices = {
-			{ value = 'all', title = 'Everything I loot', caption = 'Every item you pick up, and what it is worth.', recommended = true },
-			{ value = 'selected', title = 'Only items I hunt', caption = 'Only the items you hunt or watch. Less to read.' },
-		},
-		get = function()
-			return LibsFarmAssistant.db.tracking.mode == 'selected' and 'selected' or 'all'
-		end,
-		set = function(value)
-			LibsFarmAssistant.db.tracking.mode = value == 'selected' and 'selected' or 'all'
-			Changed()
-		end,
-	})
-
-	reg:AddStep({
 		id = 'extras',
 		kind = 'toggles',
-		name = 'Extras',
-		title = 'A few extras',
-		text = 'You can change these later with /farm options.',
-		order = 20,
+		name = 'Farming',
+		title = 'How should Farm Assistant count?',
+		text = 'Gold, kills and reputation are always counted. Change these later with /farm options.',
+		order = 10,
 		items = {
+			{ key = 'huntedOnly', title = 'Only count items I hunt', caption = 'Leaves out everything you did not choose to hunt or watch. Less to read.', recommended = false },
 			{ key = 'skipPoor', title = 'Skip gray items', caption = 'Gray junk items are not counted.', recommended = false },
 			{ key = 'tooltips', title = 'Farming lines on tooltips', caption = 'Item and creature tooltips show what you farmed.', recommended = true },
 			{ key = 'tracker', title = 'Small tracker window', caption = 'A small window with what you earned and your kills.', recommended = false },
