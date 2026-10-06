@@ -45,8 +45,10 @@ local defaults = {
 			source = 'best', -- 'vendor', 'auction', 'best'
 		},
 		session = {
+			startMode = 'login', -- 'login', 'kill' (first kill after logging in), 'manual'
 			newAfterMinutes = 30,
 			pauseWhenAFK = true,
+			pauseWhenResting = false,
 		},
 		autoLoot = {
 			enabled = true,

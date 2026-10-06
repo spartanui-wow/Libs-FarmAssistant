@@ -142,11 +142,27 @@ function Options:OnEnable()
 						end,
 					},
 					sessionHeader = { name = 'Sessions', type = 'header', order = 10 },
+					startMode = {
+						name = 'Start tracking',
+						desc = 'What happens when you log in. Takes effect the next time you log in.',
+						type = 'select',
+						order = 11,
+						width = 'double',
+						values = LibsFarmAssistant.SessionManager.START_MODES,
+						sorting = LibsFarmAssistant.SessionManager.START_MODE_ORDER,
+						get = function()
+							return db.session.startMode
+						end,
+						set = function(_, val)
+							db.session.startMode = val
+							Changed()
+						end,
+					},
 					newAfter = {
 						name = 'New session after a break of',
 						desc = 'When you log back in after this many minutes, a fresh session starts and the old one goes to your history. 0 keeps one session until you start a new one yourself.',
 						type = 'range',
-						order = 11,
+						order = 12,
 						min = 0,
 						max = 240,
 						step = 5,
@@ -162,13 +178,30 @@ function Options:OnEnable()
 						name = 'Pause while away',
 						desc = 'Stop the clock while you are flagged away from keyboard, so breaks do not lower your per hour rates. It resumes when you are back.',
 						type = 'toggle',
-						order = 12,
+						order = 13,
 						width = 'full',
 						get = function()
 							return db.session.pauseWhenAFK
 						end,
 						set = function(_, val)
 							db.session.pauseWhenAFK = val
+							LibsFarmAssistant.SessionManager:UpdateAutoPause()
+							Changed()
+						end,
+					},
+					pauseWhenResting = {
+						name = 'Pause while resting',
+						desc = 'Stop the clock in cities and inns, so shopping and chatting do not lower your per hour rates. It resumes when you leave.',
+						type = 'toggle',
+						order = 14,
+						width = 'full',
+						get = function()
+							return db.session.pauseWhenResting
+						end,
+						set = function(_, val)
+							db.session.pauseWhenResting = val
+							LibsFarmAssistant.SessionManager:UpdateAutoPause()
+							Changed()
 						end,
 					},
 					smartHeader = { name = 'Notice when you start farming', type = 'header', order = 20 },

@@ -15,9 +15,22 @@ local Format = LibsFarmAssistant.Format
 
 local TICK = 5
 
+-- session.pausedFor says why tracking stopped by itself. A pause the player made leaves it nil and
+-- never resumes on its own: 'away' and 'resting' resume when that ends, 'kill' on the next kill.
+local AUTO_PAUSE = { away = true, resting = true }
+local STATE_LABEL = { away = 'away', resting = 'resting', kill = 'waiting for a kill' }
+
+-- How tracking starts at login (db.session.startMode)
+SessionManager.START_MODES = {
+	login = 'When I log in',
+	kill = 'At my first kill',
+	manual = 'Only when I press resume',
+}
+SessionManager.START_MODE_ORDER = { 'login', 'kill', 'manual' }
+
 function SessionManager:OnInitialize()
 	self.clockStart = nil -- GetTime() when the clock last started running
-	self.autoPaused = false
+	self.lastReason = nil -- the away/resting reason seen last, so only changes act
 end
 
 function SessionManager:OnEnable()
@@ -41,7 +54,9 @@ function SessionManager:OnEnable()
 	end
 
 	self:RegisterEvent('PLAYER_LOGOUT', 'Flush')
-	self:RegisterEvent('PLAYER_FLAGS_CHANGED', 'OnFlagsChanged')
+	self:RegisterEvent('PLAYER_ENTERING_WORLD', 'OnEnteringWorld')
+	self:RegisterEvent('PLAYER_FLAGS_CHANGED', 'UpdateAutoPause')
+	self:RegisterEvent('PLAYER_UPDATE_RESTING', 'UpdateAutoPause')
 	self:RegisterEvent('ZONE_CHANGED_NEW_AREA', 'Flush')
 	self:ScheduleRepeatingTimer('Tick', TICK)
 end
@@ -114,7 +129,8 @@ end
 
 ---@param paused boolean
 ---@param silent? boolean
-function SessionManager:SetPaused(paused, silent)
+---@param reason? string Why tracking paused by itself ('away', 'resting', 'kill'); nil when the player paused it
+function SessionManager:SetPaused(paused, silent, reason)
 	local session = self:Get()
 	if paused == (session.active == false) then
 		return
@@ -122,10 +138,11 @@ function SessionManager:SetPaused(paused, silent)
 	self:Flush()
 	if paused then
 		session.active = false
+		session.pausedFor = reason
 		self.clockStart = nil
 	else
 		session.active = true
-		self.autoPaused = false
+		session.pausedFor = nil
 		self:StartClock()
 	end
 	if not silent then
@@ -133,6 +150,29 @@ function SessionManager:SetPaused(paused, silent)
 	end
 	LibsFarmAssistant:SendMessage('LIBSFA_SESSION_STATE')
 	LibsFarmAssistant:UpdateDisplay()
+end
+
+---Why tracking paused by itself, or nil.
+---@return string|nil
+function SessionManager:PausedFor()
+	local session = LibsFarmAssistant.char.session
+	return session and session.active == false and session.pausedFor or nil
+end
+
+---Short state for headers: farming, paused, away, resting or waiting for a kill.
+---@return string
+function SessionManager:StateLabel()
+	if self:IsActive() then
+		return 'farming'
+	end
+	return STATE_LABEL[self:PausedFor()] or 'paused'
+end
+
+---The state label with a capital first letter, for text that starts a line.
+---@return string
+function SessionManager:StateText()
+	local label = self:StateLabel()
+	return label:sub(1, 1):upper() .. label:sub(2)
 end
 
 function SessionManager:Toggle()
@@ -157,7 +197,6 @@ function SessionManager:NewSession(quiet)
 
 	self:Begin()
 	self.clockStart = nil
-	self.autoPaused = false
 	self:StartClock()
 
 	if LibsFarmAssistant.ResetGoalCompletion then
@@ -170,24 +209,87 @@ function SessionManager:NewSession(quiet)
 	end
 end
 
-function SessionManager:OnFlagsChanged(_, unit)
-	if unit and unit ~= 'player' then
+-- Fires on every loading screen; only the first one, at login or after a reload, matters.
+function SessionManager:OnEnteringWorld(_, _, isReloadingUi)
+	if self.enteredWorld then
 		return
 	end
-	if not LibsFarmAssistant.db.session.pauseWhenAFK then
+	self.enteredWorld = true
+	if isReloadingUi then
+		-- A reload is not a login: keep the state and only act on what changes from here
+		self.lastReason = self:AutoPauseReason()
 		return
 	end
-	local afk = UnitIsAFK('player')
-	if not Compat.CanAccess(afk) then
-		return
-	end
-	if afk and self:IsActive() then
-		self.autoPaused = true
+	self:ApplyStartMode()
+	self:UpdateAutoPause()
+end
+
+---At login the player's choice decides, whatever state the last session was left in: track at once,
+---wait for the first kill, or stay paused until they resume.
+function SessionManager:ApplyStartMode()
+	local mode = LibsFarmAssistant.db.session.startMode
+	local session = self:Get()
+	if mode == 'manual' or mode == 'kill' then
 		self:SetPaused(true, true)
-		LibsFarmAssistant:Print('Tracking paused while you are away.')
-	elseif not afk and self.autoPaused and not self:IsActive() then
+		session.pausedFor = mode == 'kill' and 'kill' or nil
+	else
 		self:SetPaused(false, true)
-		LibsFarmAssistant:Print('Welcome back. Tracking resumed.')
+	end
+	LibsFarmAssistant:SendMessage('LIBSFA_SESSION_STATE')
+end
+
+---Starts tracking on a kill when the player chose to start that way. Called before the kill is
+---counted, so the first kill is part of the session.
+function SessionManager:StartOnKill()
+	if self:PausedFor() == 'kill' then
+		self:SetPaused(false, true)
+		LibsFarmAssistant:Print('First kill. Tracking started.')
+	end
+end
+
+---@return string|nil reason 'away' or 'resting' when tracking should pause by itself
+function SessionManager:AutoPauseReason()
+	local settings = LibsFarmAssistant.db.session
+	if settings.pauseWhenAFK then
+		local afk = UnitIsAFK('player')
+		if Compat.CanAccess(afk) and afk then
+			return 'away'
+		end
+	end
+	if settings.pauseWhenResting and IsResting then
+		local resting = IsResting()
+		if Compat.CanAccess(resting) and resting then
+			return 'resting'
+		end
+	end
+	return nil
+end
+
+---Pauses while away or resting and resumes afterwards. Acts only when the reason changes, so a
+---player who resumes by hand in town is not paused again until they leave and come back.
+function SessionManager:UpdateAutoPause(event, unit)
+	if event == 'PLAYER_FLAGS_CHANGED' and unit and unit ~= 'player' then
+		return
+	end
+	local reason = self:AutoPauseReason()
+	if reason == self.lastReason then
+		return
+	end
+	local previous = self.lastReason
+	self.lastReason = reason
+	local session = self:Get()
+
+	if reason then
+		if self:IsActive() then
+			self:SetPaused(true, true, reason)
+			LibsFarmAssistant:Print(reason == 'away' and 'Tracking paused while you are away.' or 'Tracking paused while you rest.')
+		elseif AUTO_PAUSE[session.pausedFor] then
+			session.pausedFor = reason
+			LibsFarmAssistant:SendMessage('LIBSFA_SESSION_STATE')
+		end
+	elseif AUTO_PAUSE[session.pausedFor] and not self:IsActive() then
+		self:SetPaused(false, true)
+		LibsFarmAssistant:Print(previous == 'away' and 'Welcome back. Tracking resumed.' or 'Tracking resumed.')
 	end
 end
 

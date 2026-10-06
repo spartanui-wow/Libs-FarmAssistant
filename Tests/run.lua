@@ -333,6 +333,78 @@ H.test('afk pauses and resumes', function()
 	H.eq(A:IsSessionActive(), true, 'resumed when back')
 end)
 
+H.test('resting pauses and resumes', function()
+	local SM = A.SessionManager
+	A.db.session.pauseWhenResting = true
+	H.state.resting = true
+	H.fire('PLAYER_UPDATE_RESTING')
+	H.eq(A:IsSessionActive(), false, 'paused in a city')
+	H.eq(SM:StateLabel(), 'resting', 'state says resting')
+	H.state.afk = true
+	H.fire('PLAYER_FLAGS_CHANGED', 'player')
+	H.state.afk = false
+	H.fire('PLAYER_FLAGS_CHANGED', 'player')
+	H.eq(A:IsSessionActive(), false, 'coming back from away in a city stays paused')
+	H.state.resting = false
+	H.fire('PLAYER_UPDATE_RESTING')
+	H.eq(A:IsSessionActive(), true, 'resumed after leaving the city')
+
+	H.state.resting = true
+	H.fire('PLAYER_UPDATE_RESTING')
+	SM:SetPaused(false, true)
+	H.fire('PLAYER_FLAGS_CHANGED', 'player')
+	H.eq(A:IsSessionActive(), true, 'resuming by hand in a city is not undone')
+	SM:SetPaused(true, true)
+	H.state.resting = false
+	H.fire('PLAYER_UPDATE_RESTING')
+	H.eq(A:IsSessionActive(), false, 'a pause made by hand does not resume on leaving')
+	SM:SetPaused(false, true)
+
+	H.state.resting = true
+	H.fire('PLAYER_UPDATE_RESTING')
+	A.db.session.pauseWhenResting = false
+	SM:UpdateAutoPause()
+	H.eq(A:IsSessionActive(), true, 'turning the setting off resumes')
+	H.state.resting = false
+	SM:UpdateAutoPause()
+end)
+
+H.test('start tracking at the first kill', function()
+	local SM = A.SessionManager
+	A.db.session.startMode = 'kill'
+	SM.enteredWorld = false
+	H.fire('PLAYER_ENTERING_WORLD', true, false)
+	H.eq(A:IsSessionActive(), false, 'waiting after login')
+	H.eq(SM:StateLabel(), 'waiting for a kill', 'state says waiting')
+	local s = Ledger:Session()
+	local kills = s.kills
+	H.kill(7440, 'Winterfall Den Watcher', 700)
+	H.eq(A:IsSessionActive(), true, 'first kill starts tracking')
+	H.eq(s.kills, kills + 1, 'the first kill is counted')
+
+	SM:SetPaused(true, true)
+	SM.enteredWorld = false
+	H.fire('PLAYER_ENTERING_WORLD', false, true)
+	H.eq(A:IsSessionActive(), false, 'a reload keeps the state')
+	H.kill(7440, 'Winterfall Den Watcher', 701)
+	H.eq(A:IsSessionActive(), false, 'a kill does not resume a pause made by hand')
+	SM:SetPaused(false, true)
+end)
+
+H.test('start tracking by hand', function()
+	local SM = A.SessionManager
+	A.db.session.startMode = 'manual'
+	SM.enteredWorld = false
+	H.fire('PLAYER_ENTERING_WORLD', true, false)
+	H.eq(A:IsSessionActive(), false, 'paused after login')
+	H.kill(7440, 'Winterfall Den Watcher', 702)
+	H.eq(A:IsSessionActive(), false, 'kills do not start it')
+	A.db.session.startMode = 'login'
+	SM.enteredWorld = false
+	H.fire('PLAYER_ENTERING_WORLD', true, false)
+	H.eq(A:IsSessionActive(), true, 'log in mode starts at once')
+end)
+
 H.test('goals', function()
 	A.db.goals[1] = { type = 'item', targetItemID = 14047, targetValue = 5, active = true }
 	local current, target = A.GoalTracker:Progress(A.db.goals[1])
@@ -568,6 +640,23 @@ if not coreOnly then
 			H.ok(A.dataObject.text ~= nil, 'broker text ' .. format)
 		end
 		H.advance(2)
+	end)
+
+	H.test('ui tracking settings', function()
+		local win = A.Window
+		win:ToggleSettings()
+		local panel = win.settingsPanel
+		H.ok(panel:IsShown(), 'settings open from the header')
+		H.eq(panel.start.selected, A.db.session.startMode, 'start choice shown')
+		panel.start.buttons[2]:GetScript('OnClick')(panel.start.buttons[2])
+		H.eq(A.db.session.startMode, 'kill', 'start choice saved')
+		local wasResting = A.db.session.pauseWhenResting
+		panel.resting:GetScript('OnClick')(panel.resting)
+		H.eq(A.db.session.pauseWhenResting, not wasResting, 'resting toggle saved')
+		panel.resting:GetScript('OnClick')(panel.resting)
+		A.db.session.startMode = 'login'
+		win:ToggleSettings()
+		H.ok(not panel:IsShown(), 'settings close again')
 	end)
 
 	H.test('ui detail panes', function()

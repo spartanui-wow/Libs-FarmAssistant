@@ -59,7 +59,7 @@ end
 ---@return string
 function DataBroker:Text()
 	if not LibsFarmAssistant:IsSessionActive() then
-		return '|cff9c9ca3Paused|r'
+		return '|cff9c9ca3' .. LibsFarmAssistant.SessionManager:StateText() .. '|r'
 	end
 	local bucket = Ledger:Session()
 	local format = LibsFarmAssistant.db.display.format

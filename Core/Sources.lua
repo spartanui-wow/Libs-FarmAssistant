@@ -173,6 +173,7 @@ function Sources:CountKill(guid)
 
 	self:Name(key, guid)
 	self.lastKill = { key = key, at = GetTime() }
+	LibsFarmAssistant.SessionManager:StartOnKill()
 	if Tracking() then
 		Ledger:AddKill(key)
 		LibsFarmAssistant:SendMessage('LIBSFA_ATTEMPT', key)
@@ -220,6 +221,7 @@ function Sources:CountEncounter(encounterID, name)
 	local key = 'e:' .. encounterID
 	Ledger.RememberSource(key, Compat.Readable(name), 'boss')
 	self.lastKill = { key = key, at = now }
+	LibsFarmAssistant.SessionManager:StartOnKill()
 	if Tracking() then
 		for _, bucket in ipairs(Ledger:Targets()) do
 			local stats = Ledger.SourceIn(bucket, key)

@@ -66,6 +66,7 @@ UI\Theme.lua
 UI\Widgets.lua
 UI\Components.lua
 UI\Window.lua
+UI\QuickSettings.lua
 UI\Pages\Overview.lua
 UI\Pages\Loot.lua
 UI\Pages\Hunts.lua

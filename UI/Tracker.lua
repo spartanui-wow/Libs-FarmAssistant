@@ -176,7 +176,7 @@ function Tracker:Refresh()
 		return
 	end
 	local active = LibsFarmAssistant:IsSessionActive()
-	self.state:SetText(active and 'Farming' or (LibsFarmAssistant.SessionManager.autoPaused and 'Away' or 'Paused'))
+	self.state:SetText(LibsFarmAssistant.SessionManager:StateText())
 	T.Color(self.state, active and C.muted or C.warn)
 	self:UpdateClock()
 

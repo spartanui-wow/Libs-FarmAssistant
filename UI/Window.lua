@@ -213,8 +213,15 @@ function Window:CreateHeader()
 		frame:Hide()
 	end)
 
+	local settings = W.IconButton(header, 'settings', { 'Tracking settings', 'When tracking starts, and pausing while resting or away.' })
+	settings:SetPoint('RIGHT', close, 'LEFT', -4, 0)
+	settings:SetScript('OnClick', function()
+		self:ToggleSettings()
+	end)
+	self.settingsButton = settings
+
 	local tracker = W.IconButton(header, 'tracker', { 'Compact tracker', 'Show or hide the small always-on tracker.' })
-	tracker:SetPoint('RIGHT', close, 'LEFT', -4, 0)
+	tracker:SetPoint('RIGHT', settings, 'LEFT', -4, 0)
 	tracker:SetScript('OnClick', function()
 		LibsFarmAssistant:ToggleTracker()
 	end)
@@ -419,9 +426,8 @@ function Window:UpdateHeader()
 		return
 	end
 	local active = LibsFarmAssistant:IsSessionActive()
-	local manager = LibsFarmAssistant.SessionManager
 	T.Tint(self.dot, active and C.good or C.warn)
-	self.state:SetText(active and 'farming' or (manager.autoPaused and 'away' or 'paused'))
+	self.state:SetText(LibsFarmAssistant.SessionManager:StateLabel())
 	self.pauseButton:SetGlyph(active and 'pause' or 'resume')
 	self:UpdateClock()
 end
@@ -479,6 +485,7 @@ function Window:Refresh()
 	self:UpdateHeader()
 	self:UpdateNav(bucket)
 	self:UpdateFooter()
+	self:RefreshSettings()
 	local page = LibsFarmAssistant.Pages[self.page]
 	if page and page.Refresh then
 		page:Refresh(bucket, self.range)

@@ -460,6 +460,7 @@ H.state = {
 	currencies = {}, -- currencyID -> { name, quantity }
 	zone = 'Winterspring',
 	afk = false,
+	resting = false,
 	inCombat = false,
 }
 
@@ -486,6 +487,9 @@ function IsPlayerAtEffectiveMaxLevel()
 end
 function UnitIsAFK()
 	return H.state.afk
+end
+function IsResting()
+	return H.state.resting
 end
 function IsEncounterInProgress()
 	return false

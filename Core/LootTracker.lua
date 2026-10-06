@@ -225,6 +225,9 @@ function LootTracker:CountOpen(guid, key)
 	looted[guid] = true
 	lootedCount = lootedCount + 1
 
+	if key:sub(1, 2) == 'c:' and not LibsFarmAssistant.Sources:WasCounted(guid) then
+		LibsFarmAssistant.SessionManager:StartOnKill()
+	end
 	if not LibsFarmAssistant:IsSessionActive() then
 		return
 	end

@@ -28,7 +28,7 @@ function LibsFarmAssistant:BuildTooltip(tooltip)
 
 	tooltip:AddDoubleLine(
 		'Farm Assistant',
-		(active and '' or 'Paused  ') .. Format.Clock(self:GetSessionDuration()),
+		(active and '' or (self.SessionManager:StateText() .. '  ')) .. Format.Clock(self:GetSessionDuration()),
 		1,
 		1,
 		1,

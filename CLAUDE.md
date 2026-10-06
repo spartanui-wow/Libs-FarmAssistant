@@ -26,7 +26,10 @@ Core/
   Ledger.lua                  The data model. Buckets, writes, window sums, rates, item sources, archive
   Database.lua                AceDB defaults and migration from the v1 layout (DATA_VERSION)
   Pricing.lua                 Item meta cache (name/quality/sell price/bind) + vendor/auction value
-  SessionManager.lua          Session clock (active seconds, never timestamps), pause, AFK, new session
+  SessionManager.lua          Session clock (active seconds, never timestamps), pause, new session,
+                              start mode at login (login / first kill / manual), pause while away
+                              or resting. session.pausedFor = 'away'|'resting'|'kill' marks a pause
+                              that ends by itself; nil is the player's own pause and never resumes alone
   Sources.lua                 GUID -> source key, names, kill counting once per GUID
   LootTracker.lua             Loot window snapshot + LOOT_SLOT_CLEARED + CHAT_MSG_LOOT dedupe
   MoneyTracker.lua            GetMoney() deltas, categorized by which window is open
@@ -47,6 +50,7 @@ UI/
                               List (virtual rows), Table (columns, sort, select), tooltip helpers
   Components.lua              RepCard, HuntCard, StandingColor, RepPace, ItemRows
   Window.lua                  Main window shell: header clock + time range switch, nav, footer, pages
+  QuickSettings.lua           Header panel: start tracking, pause while resting/away (same as General)
   Pages/                      Overview, Loot, Hunts, Sources, Progress, History (FarmPage interface)
   Tracker.lua                 Compact always-on panel
   DataBroker.lua, Tooltip.lua LDB object and its tooltip
@@ -94,6 +98,9 @@ Every bucket (session, `char.days[YYYY-MM-DD]`, `char.months[YYYY-MM]`, `char.li
 - The auto-looter calls `LootTracker:Snapshot()` before `LootSlot()`; it never records items itself.
 - Money: an open loot/merchant/mail/quest window outranks one that closed a moment ago.
 - Everything checks `IsSessionActive()`; pausing stops the clock and the counting.
+- Start mode applies on the first `PLAYER_ENTERING_WORLD` with `isReloadingUi` false; a reload keeps
+  the state. Away/resting act only when the reason changes, so resuming by hand in town sticks.
+  "First kill" resumes in `Sources:CountKill` before the kill is counted, so that kill is in the session.
 - Experience per kill: kills (`LIBSFA_ATTEMPT` with a `c:` key), bar gains and `QUEST_TURNED_IN`
   rewards are gathered into a burst that closes after 1s of quiet (6s at most). The burst's
   experience minus quest rewards is split over max(kills, bar gains - quests); the rested bonus is

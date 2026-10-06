@@ -183,6 +183,16 @@ local GLYPHS = {
 	tracker = function(btn)
 		return { Bar(btn, 10, 1.5, nil, 0, 3.5), Bar(btn, 7, 1.5, nil, -1.5, 0), Bar(btn, 10, 1.5, nil, 0, -3.5) }
 	end,
+	settings = function(btn)
+		return {
+			Bar(btn, 10, 1, nil, 0, 3.5),
+			Bar(btn, 10, 1, nil, 0, 0),
+			Bar(btn, 10, 1, nil, 0, -3.5),
+			Bar(btn, 2.5, 3.5, nil, -2.5, 3.5),
+			Bar(btn, 2.5, 3.5, nil, 2.5, 0),
+			Bar(btn, 2.5, 3.5, nil, -1, -3.5),
+		}
+	end,
 }
 
 ---A square button that draws a small glyph.
@@ -326,6 +336,57 @@ function W.Chip(parent, text, color, onToggle)
 	end)
 	chip:SetPressed(true)
 	return chip
+end
+
+---A checkbox with a label. Clicking anywhere on the row flips it.
+---@param parent Frame
+---@param text string
+---@param onToggle fun(checked: boolean)
+---@param tooltip? table { title, ... }
+---@return Button
+function W.Check(parent, text, onToggle, tooltip)
+	local check = CreateFrame('Button', nil, parent)
+	check:SetHeight(18)
+	check:RegisterForClicks('AnyUp')
+	local box = CreateFrame('Frame', nil, check)
+	box:SetSize(12, 12)
+	box:SetPoint('LEFT', 0, 0)
+	box.border = T.Border(box, C.lineStrong)
+	local mark = box:CreateTexture(nil, 'ARTWORK')
+	mark:SetTexture(T.WHITE)
+	mark:SetPoint('TOPLEFT', 3, -3)
+	mark:SetPoint('BOTTOMRIGHT', -3, 3)
+	check.mark = mark
+	check.label = T.Text(check, 11, C.muted)
+	check.label:SetText(text)
+	check.label:SetPoint('LEFT', box, 'RIGHT', 7, 0)
+	check:SetWidth(math.floor(check.label:GetStringWidth() + 22))
+
+	function check:Paint()
+		T.Tint(self.mark, self.checked and C.text or { 0, 0, 0, 0 })
+		T.Color(self.label, (self.checked or self.hover) and C.text or C.muted)
+	end
+	function check:SetChecked(checked)
+		self.checked = checked and true or false
+		self:Paint()
+	end
+	check:SetScript('OnClick', function(self)
+		self:SetChecked(not self.checked)
+		onToggle(self.checked)
+	end)
+	check:SetScript('OnEnter', function(self)
+		self.hover = true
+		self:Paint()
+	end)
+	check:SetScript('OnLeave', function(self)
+		self.hover = false
+		self:Paint()
+	end)
+	if tooltip then
+		W.SetTooltip(check, unpack(tooltip))
+	end
+	check:SetChecked(false)
+	return check
 end
 
 ----------------------------------------------------------------------------------------------------
