@@ -94,7 +94,7 @@ function Window:CreateSettings()
 		quiet = true,
 		onClick = function()
 			panel:Hide()
-			LibsFarmAssistant:OpenOptions()
+			self:Open('settings')
 		end,
 	})
 	all:SetPoint('TOPRIGHT', rule, 'BOTTOMRIGHT', 0, -8)

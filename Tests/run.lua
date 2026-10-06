@@ -625,7 +625,7 @@ end)
 if not coreOnly then
 	H.test('ui smoke', function()
 		A:ToggleWindow()
-		for _, page in ipairs({ 'overview', 'loot', 'hunts', 'sources', 'progress', 'history' }) do
+		for _, page in ipairs({ 'overview', 'loot', 'hunts', 'sources', 'progress', 'history', 'settings' }) do
 			A.Window:ShowPage(page)
 			for _, range in ipairs(Ledger.WINDOWS) do
 				A.Window:SetRange(range)
@@ -657,6 +657,124 @@ if not coreOnly then
 		A.db.session.startMode = 'login'
 		win:ToggleSettings()
 		H.ok(not panel:IsShown(), 'settings close again')
+	end)
+
+	H.test('ui settings page', function()
+		local page = A.Pages.settings
+		A.Window:Open('settings')
+		H.eq(A.Window.page, 'settings', 'settings page in the menu')
+
+		-- Every option in the options table is drawn somewhere on the page
+		local drawn = {}
+		local function Visit()
+			for _, pool in pairs(page.pools) do
+				for _, widget in ipairs(pool.used) do
+					if widget.entry then
+						drawn[widget.entry.opt] = true
+					end
+				end
+			end
+		end
+		local root = A.Options.optionsTable
+		for _, top in pairs(root.args) do
+			local subs = {}
+			for key, opt in pairs(top.args) do
+				if opt.type == 'group' and not opt.inline then
+					subs[#subs + 1] = key
+				end
+			end
+			for topKey, opt in pairs(root.args) do
+				if opt == top then
+					page.selected = { topKey }
+				end
+			end
+			page:Layout()
+			Visit()
+			for _, sub in ipairs(subs) do
+				page.selected[2] = sub
+				page:Layout()
+				Visit()
+			end
+		end
+		local missing = {}
+		local function Check(group, name)
+			for key, opt in pairs(group.args) do
+				if opt.type == 'group' then
+					Check(opt, name .. '.' .. key)
+				elseif not drawn[opt] and not (opt.hidden and opt.hidden()) then
+					missing[#missing + 1] = name .. '.' .. key
+				end
+			end
+		end
+		Check(root, 'root')
+		H.eq(table.concat(missing, ', '), '', 'every option drawn')
+
+		local function Widget(kind, key)
+			for _, widget in ipairs(page.pools[kind].used) do
+				local path = widget.entry and widget.entry.path
+				if path and path[#path] == key then
+					return widget
+				end
+			end
+		end
+
+		page.selected = { 'tracking' }
+		page:Layout()
+		local loot = Widget('toggle', 'loot')
+		H.ok(loot, 'toggle drawn')
+		local before = A.db.tracking.loot
+		loot:GetScript('OnClick')(loot)
+		H.eq(A.db.tracking.loot, not before, 'toggle writes the setting')
+		loot = Widget('toggle', 'loot')
+		loot:GetScript('OnClick')(loot)
+
+		local price = Widget('select', 'priceSource')
+		price.button:GetScript('OnClick')(price.button)
+		local W = A.Widgets
+		H.ok(W.menuFrame and W.menuFrame:IsShown(), 'dropdown opens')
+		W.menuFrame.onPick({ value = 'vendor' })
+		H.eq(A.db.pricing.source, 'vendor', 'dropdown writes the setting')
+		A.db.pricing.source = 'best'
+
+		local qualities = Widget('multiselect', 'qualities')
+		local poor = qualities.checks[1]
+		poor:GetScript('OnClick')(poor)
+		H.eq(A.db.tracking.qualities[0], false, 'multiselect writes the setting')
+		A.db.tracking.qualities[0] = true
+
+		page.selected = { 'display' }
+		page:Layout()
+		local scale = Widget('range', 'trackerScale')
+		scale.slider:GetScript('OnValueChanged')(scale.slider, 1.25)
+		scale.slider:GetScript('OnMouseUp')(scale.slider)
+		H.eq(A.db.tracker.scale, 1.25, 'slider writes on release')
+		A.db.tracker.scale = 1
+
+		page.selected = { 'hunts' }
+		page:Layout()
+		local amount = Widget('input', 'targetValue')
+		amount.box:SetText('250')
+		amount.box:GetScript('OnTextChanged')(amount.box, true)
+		local goals = #A.db.goals
+		page.selected[1] = 'hunts'
+		local goalType = Widget('select', 'goalType')
+		page:Set(goalType.entry, 'kills')
+		page:Layout()
+		local add = Widget('execute', 'addGoal')
+		add:GetScript('OnClick')(add)
+		H.eq(#A.db.goals, goals + 1, 'button runs')
+		H.eq(A.db.goals[#A.db.goals].targetValue, 250, 'typed amount used')
+		page:Layout()
+		H.ok(Widget('toggle', 'goal' .. #A.db.goals .. 'toggle'), 'new goal listed at once')
+		table.remove(A.db.goals)
+		A:RefreshGoalOptions()
+
+		page.selected = { 'general' }
+		page:Layout()
+		local reset = Widget('execute', 'reset')
+		H.lastPopup = nil
+		reset:GetScript('OnClick')(reset)
+		H.eq(H.lastPopup, 'LIBSFA_CONFIRM_SETTING', 'confirm asked first')
 	end)
 
 	H.test('ui detail panes', function()

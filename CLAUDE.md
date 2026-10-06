@@ -51,7 +51,10 @@ UI/
   Components.lua              RepCard, HuntCard, StandingColor, RepPace, ItemRows
   Window.lua                  Main window shell: header clock + time range switch, nav, footer, pages
   QuickSettings.lua           Header panel: start tracking, pause while resting/away (same as General)
-  Pages/                      Overview, Loot, Hunts, Sources, Progress, History (FarmPage interface)
+  Pages/                      Overview, Loot, Hunts, Sources, Progress, History, Settings (FarmPage interface)
+                              Settings draws Options.optionsTable with the window's widgets (tabs for
+                              non-inline groups, flowing rows by option width), so it always matches
+                              /farm options. New options need no page code.
   Tracker.lua                 Compact always-on panel
   DataBroker.lua, Tooltip.lua LDB object and its tooltip
   GameTooltips.lua            Optional lines on item and creature tooltips
@@ -127,6 +130,9 @@ hunt also keeps `weekKey`/`weekAttempts` (week = since the weekly reset).
   for game meaning (item quality, standing, gold, good/bad). Friz for words, Arial Narrow for figures.
 - No Unicode glyphs: icons are textures; header glyphs are drawn from bars (`W.IconButton`).
 - Pages implement `Create(parent, window)`, `Refresh(bucket, range)`, optional `Count(bucket)`.
+- Settings page: every change calls AceConfigRegistry `NotifyChange`, which redraws the page and the
+  game's options window. It does not redraw while a box has focus or a slider is being dragged;
+  sliders write on release.
 - Design direction and the layout mock live in `.impeccable/` (git-ignored, local only).
 
 ## Testing

@@ -25,7 +25,7 @@ local C = T.color
 local Ledger = LibsFarmAssistant.Ledger
 local Format = LibsFarmAssistant.Format
 
-local PAGE_ORDER = { 'overview', 'loot', 'hunts', 'sources', 'progress', 'history' }
+local PAGE_ORDER = { 'overview', 'loot', 'hunts', 'sources', 'progress', 'history', 'settings' }
 local RANGES = {
 	{ key = 'session', label = 'Session', tooltip = 'Since this session started.' },
 	{ key = 'today', label = 'Today' },

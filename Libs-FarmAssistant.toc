@@ -73,6 +73,7 @@ UI\Pages\Hunts.lua
 UI\Pages\Sources.lua
 UI\Pages\Progress.lua
 UI\Pages\History.lua
+UI\Pages\Settings.lua
 UI\Tracker.lua
 UI\DataBroker.lua
 UI\Tooltip.lua
