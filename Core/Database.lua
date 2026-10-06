@@ -48,7 +48,7 @@ local defaults = {
 			startMode = 'login', -- 'login', 'kill' (first kill after logging in), 'manual'
 			newAfterMinutes = 30,
 			pauseWhenAFK = true,
-			pauseWhenResting = false,
+			pauseWhenResting = true,
 		},
 		autoLoot = {
 			enabled = true,
