@@ -777,6 +777,45 @@ if not coreOnly then
 		H.eq(H.lastPopup, 'LIBSFA_CONFIRM_SETTING', 'confirm asked first')
 	end)
 
+	H.test("game's own auto loot", function()
+		local args = A.Options.optionsTable.args.autoLooting.args.game.args
+		local info = {}
+		A.db.autoLoot.enabled = true
+		H.cvars.autoLootDefault = '0'
+		H.eq(A:AutoLootConflict(), false, 'no conflict with the game setting off')
+		H.ok(args.status.name():find('chooses'), 'status says Farm Assistant chooses')
+		H.eq(args.useOurs.hidden(), true, 'fix button hidden without a conflict')
+
+		args.gameAutoLoot.set(info, true)
+		H.eq(H.cvars.autoLootDefault, '1', 'toggle writes the game setting')
+		H.eq(args.gameAutoLoot.get(info), true, 'toggle reads the game setting')
+		H.eq(A:AutoLootConflict(), true, 'conflict when both are on')
+		H.ok(args.status.name():find('Both are on'), 'status warns about the conflict')
+		H.eq(args.useOurs.hidden(), false, 'fix button shown')
+
+		local taken = 0
+		local realLootSlot = LootSlot
+		LootSlot = function()
+			taken = taken + 1
+		end
+		A.LootingCore:OnLootWindowReady('LOOT_READY', true)
+		LootSlot = realLootSlot
+		H.eq(taken, 0, 'the looter stays out of the way while the game takes everything')
+
+		args.useOurs.func(info)
+		H.eq(H.cvars.autoLootDefault, '0', 'fix button turns the game setting off')
+
+		args.gameAutoLootKey.set(info, 'ALT')
+		H.eq(H.modifiedClicks.AUTOLOOTTOGGLE, 'ALT', 'key choice writes the game binding')
+		H.eq(args.gameAutoLootKey.get(info), 'ALT', 'key choice reads the game binding')
+		H.ok(args.status.name():find('Alt'), 'status names the key')
+		args.gameAutoLootKey.set(info, 'SHIFT')
+
+		C_CVar.SetCVar('autoLootDefault', '1')
+		H.eq(A.Options.gameAutoLoot, 'true:SHIFT', 'a change in the game options is noticed')
+		C_CVar.SetCVar('autoLootDefault', '0')
+	end)
+
 	H.test('ui detail panes', function()
 		A.Window:SetRange('all')
 		local loot = A.Pages.loot

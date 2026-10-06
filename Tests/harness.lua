@@ -491,6 +491,33 @@ end
 function IsResting()
 	return H.state.resting
 end
+H.cvars = { autoLootDefault = '0' }
+H.modifiedClicks = { AUTOLOOTTOGGLE = 'SHIFT' }
+C_CVar = {
+	GetCVarBool = function(name)
+		return H.cvars[name] == '1'
+	end,
+	GetCVar = function(name)
+		return H.cvars[name]
+	end,
+	SetCVar = function(name, value)
+		H.cvars[name] = tostring(value)
+		H.fire('CVAR_UPDATE', name, tostring(value))
+		return true
+	end,
+}
+function GetModifiedClick(action)
+	return H.modifiedClicks[action]
+end
+function SetModifiedClick(action, key)
+	H.modifiedClicks[action] = key
+end
+function GetCurrentBindingSet()
+	return 1
+end
+function SaveBindings()
+	H.fire('UPDATE_BINDINGS')
+end
 function IsEncounterInProgress()
 	return false
 end

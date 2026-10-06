@@ -18,16 +18,33 @@ function LootingCore:OnEnable()
 	self:RegisterEvent(event, 'OnLootWindowReady')
 
 	LibsFarmAssistant:Log(string.format('Auto-looting initialized (event: %s)', event), 'info')
+
+	if LibsFarmAssistant:AutoLootConflict() then
+		LibsFarmAssistant:Print("The game's own auto loot is on, so it picks up everything and your Farm Assistant loot filters are skipped. Change it in Settings > Auto-Loot.")
+	end
 end
 
 function LootingCore:OnDisable()
 	self:UnregisterAllEvents()
 end
 
+---Both auto looters are on: the game takes everything before the filters here get a say.
+---@return boolean
+function LibsFarmAssistant:AutoLootConflict()
+	local settings = self.db.autoLoot
+	return settings and settings.enabled and (self.Compat.GameAutoLoot()) or false
+end
+
 ---Handle loot window opening - process all slots through module chain
 ---@param event string
-function LootingCore:OnLootWindowReady(event)
+---@param gameAutoLoot boolean The game is taking every slot of this window itself
+function LootingCore:OnLootWindowReady(event, gameAutoLoot)
 	if not LibsFarmAssistant.db.autoLoot or not LibsFarmAssistant.db.autoLoot.enabled then
+		return
+	end
+	-- The game's auto loot (or its auto loot key held down) is already taking every slot.
+	-- Taking the same slots again would only race it; the loot is still counted.
+	if gameAutoLoot and LibsFarmAssistant.Compat.CanAccess(gameAutoLoot) then
 		return
 	end
 

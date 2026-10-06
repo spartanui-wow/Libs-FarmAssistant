@@ -469,3 +469,47 @@ function Compat.RegisterEvent(module, event, handler, arg)
 	end
 	return true
 end
+
+----------------------------------------------------------------------------------------------------
+-- The game's own auto loot (Options > Controls > Auto Loot and Auto Loot Key)
+----------------------------------------------------------------------------------------------------
+
+local AUTO_LOOT_CVAR = 'autoLootDefault'
+local AUTO_LOOT_KEY = 'AUTOLOOTTOGGLE'
+
+---@return boolean on The game picks up everything when a loot window opens
+---@return string key The key that flips that for one loot: SHIFT, CTRL, ALT or NONE
+function Compat.GameAutoLoot()
+	local on
+	if C_CVar and C_CVar.GetCVarBool then
+		on = C_CVar.GetCVarBool(AUTO_LOOT_CVAR)
+	elseif GetCVarBool then
+		on = GetCVarBool(AUTO_LOOT_CVAR)
+	end
+	local key = GetModifiedClick and GetModifiedClick(AUTO_LOOT_KEY) or nil
+	return on and true or false, key or 'NONE'
+end
+
+---@param on boolean
+function Compat.SetGameAutoLoot(on)
+	local value = on and '1' or '0'
+	if C_CVar and C_CVar.SetCVar then
+		C_CVar.SetCVar(AUTO_LOOT_CVAR, value)
+	elseif SetCVar then
+		SetCVar(AUTO_LOOT_CVAR, value)
+	end
+end
+
+---Key bindings cannot be saved in combat.
+---@param key string SHIFT, CTRL, ALT or NONE
+---@return boolean changed
+function Compat.SetGameAutoLootKey(key)
+	if not SetModifiedClick or InCombatLockdown() then
+		return false
+	end
+	SetModifiedClick(AUTO_LOOT_KEY, key)
+	if SaveBindings and GetCurrentBindingSet then
+		SaveBindings(GetCurrentBindingSet())
+	end
+	return true
+end

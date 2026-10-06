@@ -99,6 +99,11 @@ Every bucket (session, `char.days[YYYY-MM-DD]`, `char.months[YYYY-MM]`, `char.li
   rolls) is credited to the last kill within 20 seconds.
 - Group-loot items at or above the roll threshold are left to the chat path (only the winner gets them).
 - The auto-looter calls `LootTracker:Snapshot()` before `LootSlot()`; it never records items itself.
+- The game's own auto loot (`autoLootDefault` CVar, `AUTOLOOTTOGGLE` modifier, read and written through
+  `Compat.GameAutoLoot`/`SetGameAutoLoot`/`SetGameAutoLootKey`) takes every slot itself. When the loot
+  event's `autoLoot` argument is true the auto-looter does nothing, so with both on the filters are
+  skipped (`LibsFarmAssistant:AutoLootConflict()`, shown in Auto-Loot and warned at login). Options
+  follow `CVAR_UPDATE`/`UPDATE_BINDINGS` so a change in the game's own window shows at once.
 - Money: an open loot/merchant/mail/quest window outranks one that closed a moment ago.
 - Everything checks `IsSessionActive()`; pausing stops the clock and the counting.
 - Start mode applies on the first `PLAYER_ENTERING_WORLD` with `isReloadingUi` false; a reload keeps

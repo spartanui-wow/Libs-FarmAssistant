@@ -35,6 +35,40 @@ local function Notify()
 	LibStub('AceConfigRegistry-3.0'):NotifyChange('LibsFarmAssistant')
 end
 
+local AUTO_LOOT_KEYS = { SHIFT = 'Shift', CTRL = 'Ctrl', ALT = 'Alt', NONE = 'None' }
+
+---Plain words for how the game's auto loot and this addon's auto loot work together right now.
+---@return string
+local function GameAutoLootStatus()
+	local on, key = Compat.GameAutoLoot()
+	local ours = LibsFarmAssistant.db.autoLoot.enabled
+	local hold = AUTO_LOOT_KEYS[key] and key ~= 'NONE' and AUTO_LOOT_KEYS[key]
+	local text
+	if on and ours then
+		text =
+			"|cffe8c547Both are on.|r The game's auto loot picks up everything as soon as a loot window opens, so Farm Assistant's filters, blacklist and fishing mode are skipped. Turn one of them off."
+		if hold then
+			text = text .. ' Holding ' .. hold .. ' loots by hand instead.'
+		end
+	elseif on then
+		text = "The game's auto loot is on: it picks up everything."
+		if hold then
+			text = text .. ' Hold ' .. hold .. ' to loot by hand.'
+		end
+	elseif ours then
+		text = "The game's auto loot is off, so Farm Assistant chooses what to pick up."
+		if hold then
+			text = text .. ' Holding ' .. hold .. ' makes the game take everything from that window instead.'
+		end
+	else
+		text = 'Neither auto loot is on.'
+		if hold then
+			text = text .. ' Hold ' .. hold .. ' to have the game take everything from a loot window.'
+		end
+	end
+	return text
+end
+
 local function Changed()
 	LibsFarmAssistant:SendMessage('LIBSFA_SETTINGS_CHANGED')
 	LibsFarmAssistant:UpdateDisplay()
@@ -489,6 +523,66 @@ function Options:OnEnable()
 				order = 5,
 				childGroups = 'tab',
 				args = {
+					game = {
+						name = "The game's own auto loot",
+						type = 'group',
+						order = 0,
+						inline = true,
+						args = {
+							status = {
+								name = GameAutoLootStatus,
+								type = 'description',
+								order = 1,
+							},
+							gameAutoLoot = {
+								name = 'Game auto loot',
+								desc = "The Auto Loot setting in the game's own options (Controls). When it is on, the game picks up everything in every loot window.",
+								type = 'toggle',
+								order = 2,
+								get = function()
+									return (Compat.GameAutoLoot())
+								end,
+								set = function(_, val)
+									Compat.SetGameAutoLoot(val)
+									Notify()
+								end,
+							},
+							gameAutoLootKey = {
+								name = function()
+									return Compat.GameAutoLoot() and 'Key to loot by hand' or 'Key to auto loot once'
+								end,
+								desc = "The game's Auto Loot Key. Holding it while a loot window opens does the opposite of the Game auto loot setting. Cannot be changed in combat.",
+								type = 'select',
+								order = 3,
+								values = AUTO_LOOT_KEYS,
+								sorting = { 'SHIFT', 'CTRL', 'ALT', 'NONE' },
+								disabled = function()
+									return InCombatLockdown()
+								end,
+								get = function()
+									local _, key = Compat.GameAutoLoot()
+									return key
+								end,
+								set = function(_, val)
+									Compat.SetGameAutoLootKey(val)
+									Notify()
+								end,
+							},
+							useOurs = {
+								name = "Turn off the game's auto loot",
+								desc = 'Let Farm Assistant choose what to pick up.',
+								type = 'execute',
+								order = 4,
+								hidden = function()
+									return not LibsFarmAssistant:AutoLootConflict()
+								end,
+								func = function()
+									Compat.SetGameAutoLoot(false)
+									Notify()
+								end,
+							},
+						},
+					},
 					general = {
 						name = 'General',
 						type = 'group',
@@ -1355,8 +1449,21 @@ function Options:OnEnable()
 	self.optionsTable = options
 	self:RefreshGoalOptions()
 
+	-- The game's auto loot can change in its own options window; follow it.
+	self.gameAutoLoot = table.concat({ tostringall(Compat.GameAutoLoot()) }, ':')
+	Compat.RegisterEvent(self, 'CVAR_UPDATE', 'OnGameSettingChanged')
+	Compat.RegisterEvent(self, 'UPDATE_BINDINGS', 'OnGameSettingChanged')
+
 	LibStub('AceConfig-3.0'):RegisterOptionsTable('LibsFarmAssistant', options)
 	LibStub('AceConfigDialog-3.0'):AddToBlizOptions('LibsFarmAssistant', "Lib's Farm Assistant")
+end
+
+function Options:OnGameSettingChanged()
+	local state = table.concat({ tostringall(Compat.GameAutoLoot()) }, ':')
+	if state ~= self.gameAutoLoot then
+		self.gameAutoLoot = state
+		Notify()
+	end
 end
 
 ---Rebuild the dynamic goal list entries in the options table
