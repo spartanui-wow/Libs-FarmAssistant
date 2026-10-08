@@ -41,8 +41,8 @@ function DataBroker:OnEnable()
 				LibsFarmAssistant:ToggleWindow()
 			end
 		end,
-		OnTooltipShow = function(tooltip)
-			LibsFarmAssistant:BuildTooltip(tooltip)
+		OnEnter = function(frame)
+			LibsFarmAssistant.BrokerTooltip:Show(frame, LibsFarmAssistant.BrokerTooltip.HINTS.broker)
 		end,
 		OnMouseWheel = function(_, delta)
 			CycleFormat(delta > 0 and -1 or 1)
@@ -53,6 +53,8 @@ function DataBroker:OnEnable()
 
 	self:RegisterMessage('LIBSFA_UPDATE', 'UpdateDisplay')
 	self:RegisterMessage('LIBSFA_SESSION_STATE', 'UpdateDisplay')
+	self:RegisterMessage('LIBSFA_SESSION_STARTED', 'UpdateDisplay')
+	self:RegisterMessage('LIBSFA_HUNTS_UPDATED', 'UpdateDisplay')
 	self:UpdateDisplay()
 end
 
@@ -97,4 +99,5 @@ function DataBroker:UpdateDisplay()
 	if self.dataObj then
 		self.dataObj.text = self:Text()
 	end
+	LibsFarmAssistant.BrokerTooltip:Refresh()
 end

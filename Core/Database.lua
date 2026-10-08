@@ -90,6 +90,7 @@ local defaults = {
 		},
 		display = {
 			format = 'value', -- broker text: 'value', 'gold', 'items', 'kills', 'hunt'
+			collapsed = {}, -- broker tooltip sections the player folded: [sectionKey] = true
 		},
 		tooltips = {
 			items = true,

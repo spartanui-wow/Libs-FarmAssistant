@@ -37,6 +37,10 @@ local function SourceValue(key, stats)
 	return value
 end
 
+-- Shared with the broker tooltip, so a source reads the same there as on this page.
+Page.KIND_WORD = KIND_WORD
+Page.SourceValue = SourceValue
+
 function Page:Create(parent, window)
 	self.window = window
 	self.filter = 'all'

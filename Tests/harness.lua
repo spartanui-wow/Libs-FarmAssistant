@@ -851,6 +851,156 @@ local function LoadUILibraries()
 	end
 	function icon:Show() end
 	function icon:Hide() end
+	H.LoadQTip()
+end
+
+-- A recording stand-in for LibQTip-2.0: rows of cells with their text and scripts. Cell scripts
+-- are called the way the library calls them: handler(cell, arg, ...).
+function H.LoadQTip()
+	local QTip = LibStub:NewLibrary('LibQTip-2.0', 1)
+	local active, callbacks = {}, {}
+	H.qtip = QTip
+
+	local Cell = {}
+	Cell.__index = Cell
+	function Cell:SetText(text)
+		self.text = text
+		return self
+	end
+	function Cell:SetColSpan(size)
+		self.colSpan = size
+		return self
+	end
+	function Cell:SetTextColor()
+		return self
+	end
+	function Cell:SetScript(scriptType, handler, arg)
+		self.scripts[scriptType] = handler and { handler = handler, arg = arg } or nil
+		return self
+	end
+	function Cell:Fire(scriptType, ...)
+		local script = self.scripts[scriptType]
+		if script then
+			script.handler(self, script.arg, ...)
+		end
+	end
+
+	local Row = {}
+	Row.__index = Row
+	function Row:GetCell(i)
+		self.cells[i] = self.cells[i] or setmetatable({ scripts = {} }, Cell)
+		return self.cells[i]
+	end
+	function Row:SetColor(...)
+		self.color = { ... }
+		return self
+	end
+	function Row:Text()
+		local parts = {}
+		for i = 1, 3 do
+			local cell = self.cells[i]
+			parts[#parts + 1] = cell and cell.text or ''
+		end
+		return (table.concat(parts, ' | '):gsub('|c%x%x%x%x%x%x%x%x', ''):gsub('|r', ''):gsub('|T.-|t ', ''))
+	end
+
+	local Tooltip = {}
+	local function AddRow(self, heading, ...)
+		local row = setmetatable({ cells = {}, heading = heading }, Row)
+		for i = 1, select('#', ...) do
+			local value = select(i, ...)
+			if value ~= nil then
+				row:GetCell(i):SetText(value)
+			end
+		end
+		self.rows[#self.rows + 1] = row
+		return row
+	end
+	function Tooltip:AddRow(...)
+		return AddRow(self, false, ...)
+	end
+	function Tooltip:AddHeadingRow(...)
+		return AddRow(self, true, ...)
+	end
+	function Tooltip:AddSeparator()
+		local row = AddRow(self, false)
+		row.separator = true
+		return row
+	end
+	function Tooltip:SetMaxHeight(height)
+		self.maxHeight = height
+		return self
+	end
+	function Tooltip:SmartAnchorTo(frame)
+		self.anchor = frame
+		return self
+	end
+	function Tooltip:SetAutoHideDelay(delay, frame)
+		self.autoHide = delay
+		self.autoHideFrame = frame
+		return self
+	end
+	function Tooltip:UpdateLayout()
+		return self
+	end
+	function Tooltip:Show()
+		self.shown = true
+	end
+	function Tooltip:IsMouseOver()
+		return H.mouseOverQTip or false
+	end
+	---Rows that hold text, without the spacing separators.
+	function Tooltip:Lines()
+		local lines = {}
+		for _, row in ipairs(self.rows) do
+			if not row.separator then
+				lines[#lines + 1] = row
+			end
+		end
+		return lines
+	end
+	---The first row whose text (or one column's text) contains the given plain text.
+	function Tooltip:Find(text, column)
+		for _, row in ipairs(self:Lines()) do
+			local cell = column and row.cells[column]
+			local haystack = column and (cell and cell.text or '') or row:Text()
+			if haystack:find(text, 1, true) then
+				return row
+			end
+		end
+	end
+
+	function QTip:AcquireTooltip(key, columns)
+		local tip = active[key]
+		if not tip then
+			tip = H.NewFrame('Frame')
+			for name, method in pairs(Tooltip) do
+				tip[name] = method
+			end
+			tip.key = key
+			active[key] = tip
+		end
+		tip.rows = {}
+		tip.columns = columns
+		return tip
+	end
+	function QTip:IsAcquiredTooltip(key)
+		return active[key] ~= nil
+	end
+	function QTip:ReleaseTooltip(tip)
+		if not tip or active[tip.key] ~= tip then
+			return
+		end
+		active[tip.key] = nil
+		tip.shown = false
+		for target, fn in pairs(callbacks) do
+			fn('OnReleaseTooltip', tip)
+		end
+		H.released = (H.released or 0) + 1
+	end
+	function QTip.RegisterCallback(target, _, fn)
+		callbacks[target] = fn
+	end
 end
 
 ---Loads everything and runs the login sequence.

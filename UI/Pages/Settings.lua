@@ -723,17 +723,17 @@ function Page:NewRow(cursor)
 end
 
 local WIDTH_UNITS = { half = 0.5, normal = 1, double = 2 }
-local FULL_ROW = { header = true, description = true, multiselect = true }
+local FULL_ROW = { heading = true, text = true, multiselect = true }
 
 ---Places one option in the flowing rows.
 function Page:Place(kind, entry, cursor)
 	local opt = entry.opt
-	local units = (opt.width == 'full' or FULL_ROW[opt.type]) and self.cap or WIDTH_UNITS[opt.width or 'normal'] or 1
+	local units = (opt.width == 'full' or FULL_ROW[kind]) and self.cap or WIDTH_UNITS[opt.width or 'normal'] or 1
 	units = math.min(units, self.cap)
 	if cursor.used > 0 and cursor.used + units > self.cap + 0.001 then
 		self:NewRow(cursor)
 	end
-	if opt.type == 'header' and cursor.y > 0 then
+	if kind == 'heading' and cursor.y > 0 then
 		cursor.y = cursor.y + 6
 	end
 	local width = units >= self.cap and self.width or (units * self.unit + math.max(0, math.ceil(units) - 1) * GAP)

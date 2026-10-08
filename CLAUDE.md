@@ -56,7 +56,9 @@ UI/
                               non-inline groups, flowing rows by option width), so it always matches
                               /farm options. New options need no page code.
   Tracker.lua                 Compact always-on panel
-  DataBroker.lua, Tooltip.lua LDB object and its tooltip
+  DataBroker.lua, Tooltip.lua LDB object and its tooltip (LibQTip-2.0 from libs/: folding sections saved in
+                              display.collapsed, lines open the window on their page, item lines show the
+                              item and shift-click link it; BuildTooltip writes the same into a GameTooltip)
   GameTooltips.lua            Optional lines on item and creature tooltips
   Options.lua                 AceConfig tabs: General, Tracking, Hunts and Goals, Display, Auto-Loot, Watched
 Tests/                        Headless harness (not packaged)

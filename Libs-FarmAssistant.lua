@@ -44,11 +44,7 @@ function LibsFarmAssistant:OnEnable()
 				end
 			end,
 			funcOnEnter = function(button)
-				GameTooltip:SetOwner(button or AddonCompartmentFrame, 'ANCHOR_CURSOR_RIGHT')
-				self:BuildTooltip(GameTooltip)
-			end,
-			funcOnLeave = function()
-				GameTooltip:Hide()
+				self.BrokerTooltip:Show(button or AddonCompartmentFrame, self.BrokerTooltip.HINTS.compartment)
 			end,
 		})
 	end

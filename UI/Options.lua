@@ -37,34 +37,20 @@ end
 
 local AUTO_LOOT_KEYS = { SHIFT = 'Shift', CTRL = 'Ctrl', ALT = 'Alt', NONE = 'None' }
 
----Plain words for how the game's auto loot and this addon's auto loot work together right now.
+---Plain words for what the game's auto loot does right now. Only shown while it is on.
 ---@return string
 local function GameAutoLootStatus()
-	local on, key = Compat.GameAutoLoot()
-	local ours = LibsFarmAssistant.db.autoLoot.enabled
-	local hold = AUTO_LOOT_KEYS[key] and key ~= 'NONE' and AUTO_LOOT_KEYS[key]
+	local _, key = Compat.GameAutoLoot()
+	local hold = key ~= 'NONE' and AUTO_LOOT_KEYS[key]
 	local text
-	if on and ours then
+	if LibsFarmAssistant.db.autoLoot.enabled then
 		text =
-			"|cffe8c547Both are on.|r The game's auto loot picks up everything as soon as a loot window opens, so Farm Assistant's filters, blacklist and fishing mode are skipped. Turn one of them off."
-		if hold then
-			text = text .. ' Holding ' .. hold .. ' loots by hand instead.'
-		end
-	elseif on then
-		text = "The game's auto loot is on: it picks up everything."
-		if hold then
-			text = text .. ' Hold ' .. hold .. ' to loot by hand.'
-		end
-	elseif ours then
-		text = "The game's auto loot is off, so Farm Assistant chooses what to pick up."
-		if hold then
-			text = text .. ' Holding ' .. hold .. ' makes the game take everything from that window instead.'
-		end
+			"|cffe8c547The game's auto loot is on.|r It picks up everything as soon as a loot window opens, so Farm Assistant's filters, blacklist and fishing mode are skipped. Turn one of them off."
 	else
-		text = 'Neither auto loot is on.'
-		if hold then
-			text = text .. ' Hold ' .. hold .. ' to have the game take everything from a loot window.'
-		end
+		text = "The game's auto loot is on: it picks up everything."
+	end
+	if hold then
+		text = text .. ' Hold ' .. hold .. ' to loot by hand.'
 	end
 	return text
 end
@@ -528,6 +514,9 @@ function Options:OnEnable()
 						type = 'group',
 						order = 0,
 						inline = true,
+						hidden = function()
+							return not (Compat.GameAutoLoot())
+						end,
 						args = {
 							status = {
 								name = GameAutoLootStatus,
@@ -536,7 +525,7 @@ function Options:OnEnable()
 							},
 							gameAutoLoot = {
 								name = 'Game auto loot',
-								desc = "The Auto Loot setting in the game's own options (Controls). When it is on, the game picks up everything in every loot window.",
+								desc = "The Auto Loot setting in the game's own options (Controls). Turning it off hides this section.",
 								type = 'toggle',
 								order = 2,
 								get = function()
@@ -548,10 +537,8 @@ function Options:OnEnable()
 								end,
 							},
 							gameAutoLootKey = {
-								name = function()
-									return Compat.GameAutoLoot() and 'Key to loot by hand' or 'Key to auto loot once'
-								end,
-								desc = "The game's Auto Loot Key. Holding it while a loot window opens does the opposite of the Game auto loot setting. Cannot be changed in combat.",
+								name = 'Key to loot by hand',
+								desc = "The game's Auto Loot Key. Holding it while a loot window opens stops the game picking everything up. Cannot be changed in combat.",
 								type = 'select',
 								order = 3,
 								values = AUTO_LOOT_KEYS,

@@ -700,7 +700,9 @@ if not coreOnly then
 		local function Check(group, name)
 			for key, opt in pairs(group.args) do
 				if opt.type == 'group' then
-					Check(opt, name .. '.' .. key)
+					if not (opt.hidden and opt.hidden()) then
+						Check(opt, name .. '.' .. key)
+					end
 				elseif not drawn[opt] and not (opt.hidden and opt.hidden()) then
 					missing[#missing + 1] = name .. '.' .. key
 				end
@@ -782,15 +784,17 @@ if not coreOnly then
 		local info = {}
 		A.db.autoLoot.enabled = true
 		H.cvars.autoLootDefault = '0'
+		local game = A.Options.optionsTable.args.autoLooting.args.game
 		H.eq(A:AutoLootConflict(), false, 'no conflict with the game setting off')
-		H.ok(args.status.name():find('chooses'), 'status says Farm Assistant chooses')
+		H.eq(game.hidden(), true, 'section hidden while the game setting is off')
 		H.eq(args.useOurs.hidden(), true, 'fix button hidden without a conflict')
 
 		args.gameAutoLoot.set(info, true)
 		H.eq(H.cvars.autoLootDefault, '1', 'toggle writes the game setting')
 		H.eq(args.gameAutoLoot.get(info), true, 'toggle reads the game setting')
 		H.eq(A:AutoLootConflict(), true, 'conflict when both are on')
-		H.ok(args.status.name():find('Both are on'), 'status warns about the conflict')
+		H.eq(game.hidden(), false, 'section shown while the game setting is on')
+		H.ok(args.status.name():find('filters'), 'status warns about the conflict')
 		H.eq(args.useOurs.hidden(), false, 'fix button shown')
 
 		local taken = 0
@@ -802,14 +806,14 @@ if not coreOnly then
 		LootSlot = realLootSlot
 		H.eq(taken, 0, 'the looter stays out of the way while the game takes everything')
 
-		args.useOurs.func(info)
-		H.eq(H.cvars.autoLootDefault, '0', 'fix button turns the game setting off')
-
 		args.gameAutoLootKey.set(info, 'ALT')
 		H.eq(H.modifiedClicks.AUTOLOOTTOGGLE, 'ALT', 'key choice writes the game binding')
 		H.eq(args.gameAutoLootKey.get(info), 'ALT', 'key choice reads the game binding')
 		H.ok(args.status.name():find('Alt'), 'status names the key')
 		args.gameAutoLootKey.set(info, 'SHIFT')
+
+		args.useOurs.func(info)
+		H.eq(H.cvars.autoLootDefault, '0', 'fix button turns the game setting off')
 
 		C_CVar.SetCVar('autoLootDefault', '1')
 		H.eq(A.Options.gameAutoLoot, 'true:SHIFT', 'a change in the game options is noticed')
@@ -859,6 +863,10 @@ if not coreOnly then
 		A:SlashCommand('hunt ' .. H.Link(4306))
 		H.ok(A.Hunts:Get(4306), 'slash hunt')
 	end)
+end
+
+if not coreOnly then
+	dofile(root .. '/Tests/tooltip.lua')(H, A)
 end
 
 io.write(string.format('%d passed, %d failed\n', H.passed, H.failed))
