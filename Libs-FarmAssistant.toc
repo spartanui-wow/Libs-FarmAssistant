@@ -1,4 +1,4 @@
-## Interface: 120100, 120007, 16001, 50504, 38002, 20506, 11509
+## Interface: 120105, 120007, 16001, 50504, 38002, 20506, 11509
 ## Title: Lib's - Farm Assistant
 ## Notes: Tracks everything you farm - loot, gold, drops per mob, rare drop hunts, reputation, currency, experience and honor - by session, day, week and month
 ## IconTexture: Interface/Addons/Libs-FarmAssistant/Logo-Icon
